@@ -1,0 +1,107 @@
+# ---------------------------------------
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Entornos virtuales
+env/
+venv/
+ENV/
+.venv/
+.env/
+env.bak/
+venv.bak/
+
+# Archivos de configuración de entorno
+*.env
+*.env.*
+
+# Archivos de log y temporales
+*.log
+*.tmp
+*.bak
+*.swp
+
+# Archivos de Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Directorios de salida
+build/
+dist/
+*.egg-info/
+
+# Configuraciones de IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# MacOS
+.DS_Store
+
+# Linux
+*~ 
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Archivos de datos pesados
+data/*.csv
+data/*.xlsx
+data/*.json
+
+# Archivos de salida de análisis
+outputs/
+reports/
+results/
+figures/
+plots/
+
+# Archivos de Streamlit
+.streamlit/
+
+# Control de notebooks convertidos
+notebooks_convertidos/
+
+# PyInstaller
+*.spec
+
+# Otros
+*.pdf
+*.db
+
+# Cache de pytest
+.pytest_cache/
+.cache/
+
+# Carpeta oculta de notebook
+.ipynb_checkpoints/
+
+# Archivos de test de VSCode
+*.code-workspace
+
+# VSCode local history
+.history/
+
+# Archivos generados por Black o formateadores
+*.orig
+
+# Archivos de configuración específicos de OS
+*.coverage
+.coverage.*
+
+# SQLite (si se usan en pruebas)
+*.sqlite3
+
+# Carpeta de exportaciones automáticas
+exports/
+
+# Archivos CSV filtrados (si no quieres subirlos)
+datos/aire_filtrado_caribe.csv
+datos/agua_filtrada_caribe.csv

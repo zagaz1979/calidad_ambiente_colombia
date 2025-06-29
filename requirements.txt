@@ -1,0 +1,42 @@
+# Requerimientos para Análisis de Calidad del Aire y Agua en Colombia
+# En los departamentos de Córdoba, Cesar y Bolívar
+
+# Manejo de datos
+pandas==2.2.2
+
+# Visualización
+matplotlib==3.9.0
+seaborn==0.13.2
+
+# Machine Learning
+scikit-learn==1.5.0
+
+# Aplicación interactiva
+streamlit==1.35.0
+
+# Reportes en Jupyter (opcional para futuras expansiones)
+jupyter==1.0.0
+
+# Control de compatibilidad
+python-dateutil
+numpy
+
+# Para exportar notebooks a PDF en expansiones
+nbconvert==7.16.4
+
+# Para Streamlit Cloud, Render o Railway
+watchdog
+
+# Formateo y buenas prácticas (opcional)
+black
+isort
+
+# Control de advertencias
+packaging
+
+# Para futuros dashboards en PDF / Markdown
+pdfkit
+markdown
+
+# Opcional: tqdm para barras de progreso en notebooks
+tqdm
