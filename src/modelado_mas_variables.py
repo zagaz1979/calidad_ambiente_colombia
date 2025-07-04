@@ -3,7 +3,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import streamlit as st
-
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.ensemble import RandomForestRegressor
@@ -13,7 +12,7 @@ from io import BytesIO
 import os
 
 def ejecutar_modelado_avanzado_features():
-    st.header("\U0001F52E Modelado Predictivo Avanzado con Selección de Features")
+    st.header("Modelado Predictivo Avanzado con Selección de Features")
 
     df = pd.read_csv('./data/aire_filtrado_caribe.csv')
 

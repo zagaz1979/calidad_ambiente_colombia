@@ -1,14 +1,3 @@
-"""
-eda_aire.py
-
-Exploración de Datos (EDA) para Calidad del Aire en Colombia
-con filtrado por los departamentos de interés (CÓRDOBA, CESAR, BOLÍVAR).
-
-Autor: [César García, Luis Rodriguez y Rosalinda Parra]
-Fecha: 2025-06-28
-"""
-
-import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 

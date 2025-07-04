@@ -1,15 +1,3 @@
-"""
-loader.py
-
-Carga y filtrado de datos de calidad del aire y agua en Colombia,
-renombrado de columnas, limpieza y normalización de nombres de
-departamentos y municipios, filtrado de departamentos de interés
-y guardado de CSV filtrados listos para análisis y modelado.
-
-Autor: [César García, Luis Rodriguez y Rosalinda Parra]
-Fecha: 2025-06-28
-"""
-
 import pandas as pd
 
 # Configuración de rutas

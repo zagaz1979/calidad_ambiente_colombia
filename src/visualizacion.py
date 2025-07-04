@@ -1,10 +1,3 @@
-# visualizacion.py
-# =======================================================
-# Funciones de visualización de gráficos para análisis de
-# calidad del aire y agua en Colombia
-# Departamentos: [CÓRDOBA, CESAR, BOLÍVAR]
-# =======================================================
-
 import matplotlib.pyplot as plt
 import seaborn as sns
 

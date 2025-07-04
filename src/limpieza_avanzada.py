@@ -1,17 +1,3 @@
-"""
-limpieza_avanzada.py
-
-Este módulo realiza:
-Renombrado adicional y normalización de columnas.
-Normalización avanzada de municipios con correcciones específicas.
-Exploración de valores únicos en cada columna.
-Eliminación de inconsistencias comunes.
-Generación de reportes de limpieza para auditar los datasets.
-
-Autor: [César García, Luis Rodriguez y Rosalinda Parra]
-Fecha: 2025-06-28
-"""
-
 import pandas as pd
 
 # Configuración de rutas de los CSV ya filtrados

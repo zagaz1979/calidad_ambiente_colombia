@@ -21,7 +21,7 @@ Esta aplicación permite explorar interactivamente la calidad del aire y del agu
 menu = st.sidebar.selectbox(
     "Selecciona una sección",
     (
-        "Carga y Limpieza de Datos", 
+        "Dashboard",
         "EDA - Calidad del Aire", 
         "EDA - Calidad del Agua", 
         "Modelado Predictivo", 
@@ -37,18 +37,14 @@ menu = st.sidebar.selectbox(
 # -------------------------------
 # Sección: Carga y limpieza
 # -------------------------------
-if menu == "Carga y Limpieza de Datos":
-    st.header("Carga y limpieza de datos")
-    df_aire, df_agua = loader.cargar_datos()
 
-    st.subheader("Datos de Calidad del Aire (primeras filas)")
-    st.dataframe(df_aire.head())
 
-    st.subheader("Datos de Calidad del Agua (primeras filas)")
-    st.dataframe(df_agua.head())
-
-    st.info(f"Datos de aire: {df_aire.shape[0]} registros, {df_aire.shape[1]} columnas")
-    st.info(f"Datos de agua: {df_agua.shape[0]} registros, {df_agua.shape[1]} columnas")
+# -------------------------------
+# Sección: Dashboard
+# -------------------------------
+if menu == "Dashboard":
+    from src import dashboard
+    dashboard.mostrar_dashboard()
 
 # -------------------------------
 # Sección: EDA - Calidad del Aire
@@ -57,7 +53,7 @@ elif menu == "EDA - Calidad del Aire":
     st.header("Análisis Exploratorio de Datos - Calidad del Aire")
     df_aire, _ = loader.cargar_datos()
     eda_aire.eda_aire(df_aire, streamlit_mode=True)
-
+    
 # -------------------------------
 # Sección: EDA - Calidad del Agua
 # -------------------------------
@@ -66,7 +62,6 @@ elif menu == "EDA - Calidad del Agua":
     _, df_agua = loader.cargar_datos()
     eda_agua.eda_agua(df_agua, streamlit_mode=True)
     
-
 # -------------------------------
 # Sección: Modelado Predictivo
 # -------------------------------
@@ -83,6 +78,10 @@ elif menu == "Modelado Predictivo":
 elif menu == "Análisis de Outliers PM10":
     from src import analisis_outliers_pm10
     analisis_outliers_pm10.analisis_outliers_pm10()
+
+elif menu == "Análisis de Correlación PM10":
+    from src import correlacion_pm10
+    correlacion_pm10.correlacion_pm10()
 
 elif menu == "Modelado Avanzado":
     from src import modelado_avanzado
@@ -105,4 +104,4 @@ elif menu == "Modelado Avanzado Features":
 # Footer
 # -------------------------------
 st.markdown("---")
-st.markdown("### Aplicación desarrollada por [César García, Luis Rodriguez y Rosalinda Parra] | Versión: 2025-06-28")
+st.markdown("Aplicación desarrollada por [César García, Luis Rodriguez y Rosalinda Parra] | Versión: 2025-06-28")

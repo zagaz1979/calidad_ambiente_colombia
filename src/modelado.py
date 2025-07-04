@@ -1,14 +1,3 @@
-"""
-modelado.py
-
-Modelado predictivo simple sobre Calidad del Aire y Agua en Colombia.
-- Predicción de contaminantes (ejemplo: PM10) con regresión lineal.
-- Predicción de IRCA en el tiempo con regresión lineal.
-
-Autor: [César García, Luis Rodriguez y Rosalinda Parra]
-Fecha: 2025-06-28
-"""
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt

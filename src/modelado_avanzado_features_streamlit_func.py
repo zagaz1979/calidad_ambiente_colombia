@@ -1,15 +1,3 @@
-"""
-modelado_avanzado_features_streamlit_func.py
-
-Función lista para integrarse en app.py para modelado predictivo con Streamlit,
-usando regresión lineal, polinómica y Random Forest,
-permitiendo selección de features basadas en correlación,
-y generando métricas, predicciones 2024-2025 y exportación de gráficos.
-
-Autor: 
-Fecha: 2025-06-29
-"""
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
