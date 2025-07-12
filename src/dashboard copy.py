@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
+import matplotlib.pyplot as plt
+import seaborn as sns
 import datetime
 from streamlit_extras.metric_cards import style_metric_cards
 from src import loader
@@ -38,7 +39,7 @@ def mostrar_dashboard():
     st.markdown("---")
 
     # ===============================================
-    # Filtros
+    # Filtros en dos columnas
     # ===============================================
     df_aire, df_agua = loader.cargar_datos(streamlit_mode=True)
 
@@ -85,49 +86,22 @@ def mostrar_dashboard():
     st.subheader("Indicadores Clave de Desempeño (KPIs)")
 
     col1, col2, col3 = st.columns(3)
-
-    # PM10
-    promedio_pm10 = round(
-        df_aire_filtrado[df_aire_filtrado['variable'].str.upper() == 'PM10']['promedio'].mean(),
-        2
-    )
-    if pd.isna(promedio_pm10):
-        promedio_pm10_texto = "Sin datos"
-    else:
-        promedio_pm10_texto = f"{promedio_pm10} µg/m³"
-
-    # PM2.5
-    promedio_pm25 = round(
-        df_aire_filtrado[df_aire_filtrado['variable'].str.upper() == 'PM2.5']['promedio'].mean(),
-        2
-    )
-    if pd.isna(promedio_pm25):
-        promedio_pm25_texto = "Sin datos"
-    else:
-        promedio_pm25_texto = f"{promedio_pm25} µg/m³"
-
-    # IRCA
-    promedio_irca = round(
-        df_agua_filtrado['irca'].mean(),
-        2
-    )
-    if pd.isna(promedio_irca):
-        promedio_irca_texto = "Sin datos"
-    else:
-        promedio_irca_texto = f"{promedio_irca}"
-
+    
     with col1:
-        st.metric("PM10 Promedio", promedio_pm10_texto)
+        promedio_pm10 = df_aire_filtrado[df_aire_filtrado['variable'].str.upper() == 'PM10']['promedio'].mean().round(2)
+        st.metric("PM10 Promedio", f"{promedio_pm10} µg/m³")
     with col2:
-        st.metric("PM2.5 Promedio", promedio_pm25_texto)
+        promedio_pm25 = df_aire_filtrado[df_aire_filtrado['variable'].str.upper() == 'PM2.5']['promedio'].mean().round(2)
+        st.metric("PM2.5 Promedio", f"{promedio_pm25} µg/m³")
     with col3:
-        st.metric("IRCA Promedio", promedio_irca_texto)
+        promedio_irca = df_agua_filtrado['irca'].mean().round(2)
+        st.metric("IRCA Promedio", f"{promedio_irca}")
 
     style_metric_cards(background_color="#000", border_left_color="#009999", border_color="#DDDDDD")
     st.markdown("---")
 
     # ===============================================
-    # Visualizaciones con Plotly
+    # Visualizaciones
     # ===============================================
     st.subheader("Visualizaciones de Datos")
 
@@ -135,35 +109,29 @@ def mostrar_dashboard():
     df_pm10 = df_aire_filtrado[df_aire_filtrado['variable'].str.upper() == 'PM10']
     if not df_pm10.empty:
         st.markdown("**Tendencia de PM10 (µg/m³) por Año**")
+        fig, ax = plt.subplots(figsize=(10, 4))
         df_pm10_grouped = df_pm10.groupby(df_pm10['anio'].dt.year)['promedio'].mean().reset_index()
-        fig_pm10 = px.line(
-            df_pm10_grouped,
-            x='anio',
-            y='promedio',
-            markers=True,
-            labels={'anio': 'Año', 'promedio': 'PM10 (µg/m³)'},
-            template='plotly_dark',
-            color_discrete_sequence=['#00CCCC'],
-            title=f"Tendencia de PM10 en {departamento}"
-        )
-        st.plotly_chart(fig_pm10, use_container_width=True)
+        sns.lineplot(data=df_pm10_grouped, x='anio', y='promedio', marker='o', ax=ax, color="#009999")
+        ax.set_xlabel("Año")
+        ax.set_ylabel("PM10 (µg/m³)")
+        st.pyplot(fig)
     else:
         st.info("No hay datos de PM10 para este departamento en el rango seleccionado.")
 
     # Boxplot IRCA
     if not df_agua_filtrado.empty:
         st.markdown("**Distribución de IRCA por Año**")
-        df_agua_filtrado['anio_num'] = df_agua_filtrado['anio'].dt.year
-        fig_irca = px.box(
-            df_agua_filtrado,
-            x='anio_num',
+        fig, ax = plt.subplots(figsize=(10, 4))
+        sns.boxplot(
+            data=df_agua_filtrado,
+            x=df_agua_filtrado['anio'].dt.year,
             y='irca',
-            labels={'anio_num': 'Año', 'irca': 'IRCA'},
-            template='plotly_dark',
-            color_discrete_sequence=['#66b2b2'],
-            title=f"Distribución de IRCA en {departamento}"
+            ax=ax,
+            color="#66b2b2"
         )
-        st.plotly_chart(fig_irca, use_container_width=True)
+        ax.set_xlabel("Año")
+        ax.set_ylabel("IRCA")
+        st.pyplot(fig)
     else:
         st.info("No hay datos de IRCA para este departamento en el rango seleccionado.")
 
@@ -187,9 +155,9 @@ def mostrar_dashboard():
     # ===============================================
     st.subheader("Alertas")
 
-    if not pd.isna(promedio_pm10) and promedio_pm10 > 50:
+    if promedio_pm10 > 50:
         st.error(f"PM10 promedio ({promedio_pm10} µg/m³) excede el límite recomendado por OMS (50 µg/m³).")
-    if not pd.isna(promedio_irca) and promedio_irca > 40:
+    if promedio_irca > 40:
         st.warning(f"El IRCA promedio ({promedio_irca}) indica riesgo en la calidad del agua.")
 
     st.markdown("---")
@@ -198,7 +166,7 @@ def mostrar_dashboard():
     # Insights
     # ===============================================
     st.subheader("Insights")
-    if not pd.isna(promedio_pm10) and promedio_pm10 > 50:
+    if promedio_pm10 > 50:
         st.info("Los niveles elevados de PM10 sugieren evaluar fuentes de emisión en este departamento.")
-    if not pd.isna(promedio_irca) and promedio_irca > 40:
+    if promedio_irca > 40:
         st.info("El IRCA elevado puede reflejar falta de tratamiento o contaminación en fuentes de agua local.")

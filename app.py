@@ -35,11 +35,6 @@ menu = st.sidebar.selectbox(
 )
 
 # -------------------------------
-# Sección: Carga y limpieza
-# -------------------------------
-
-
-# -------------------------------
 # Sección: Dashboard
 # -------------------------------
 if menu == "Dashboard":
@@ -104,4 +99,5 @@ elif menu == "Modelado Avanzado Features":
 # Footer
 # -------------------------------
 st.markdown("---")
-st.markdown("Aplicación desarrollada por [César García, Luis Rodriguez y Rosalinda Parra] | Versión: 2025-06-28")
+st.markdown("Aplicación desarrollada por [César García, Luis Rodriguez y Rosalinda Parra] | Versión: 1.0.0")
+
