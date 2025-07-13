@@ -5,6 +5,38 @@ import datetime
 from streamlit_extras.metric_cards import style_metric_cards
 from src import loader
 
+def clasificar_irca(valor):
+    if pd.isna(valor):
+        return "Sin datos"
+    if 0 <= valor <= 5:
+        return "Sin riesgo"
+    elif 5 < valor <= 14:
+        return "Riesgo bajo"
+    elif 14 < valor <= 35:
+        return "Riesgo medio"
+    elif 35 < valor <= 80:
+        return "Riesgo alto"
+    elif 80 < valor <= 100:
+        return "Riesgo inviable sanitariamente"
+    else:
+        return "Valor fuera de rango"
+
+def clasificar_pm10(valor):
+    if pd.isna(valor):
+        return "Sin datos"
+    if valor <= 15:
+        return "Excelente"
+    elif valor <= 25:
+        return "Bueno"
+    elif valor <= 35:
+        return "Aceptable"
+    elif valor <= 50:
+        return "Regular"
+    elif valor <= 75:
+        return "Malo"
+    else:
+        return "Muy Malo"
+
 def mostrar_dashboard():
     # ===============================================
     # Estilo CSS fondo negro elegante
@@ -187,10 +219,23 @@ def mostrar_dashboard():
     # ===============================================
     st.subheader("Alertas")
 
-    if not pd.isna(promedio_pm10) and promedio_pm10 > 50:
-        st.error(f"PM10 promedio ({promedio_pm10} µg/m³) excede el límite recomendado por OMS (50 µg/m³).")
-    if not pd.isna(promedio_irca) and promedio_irca > 40:
-        st.warning(f"El IRCA promedio ({promedio_irca}) indica riesgo en la calidad del agua.")
+    if not pd.isna(promedio_pm10):
+        categoria_pm10 = clasificar_pm10(promedio_pm10)
+        if categoria_pm10 in ["Malo", "Muy Malo"]:
+            st.error(f"El PM10 promedio ({promedio_pm10} µg/m³) indica **{categoria_pm10}** calidad del aire. Supera los límites recomendados y puede afectar la salud.")
+        elif categoria_pm10 in ["Regular", "Aceptable"]:
+            st.warning(f"El PM10 promedio ({promedio_pm10} µg/m³) indica **{categoria_pm10}** calidad del aire. Se recomienda monitoreo y control de emisiones.")
+        else:
+            st.success(f"El PM10 promedio ({promedio_pm10} µg/m³) indica **{categoria_pm10}** calidad del aire.")        
+
+    if not pd.isna(promedio_irca):
+        categoria_irca = clasificar_irca(promedio_irca)
+        if categoria_irca in ["Riesgo alto", "Riesgo inviable sanitariamente"]:
+            st.warning(f"El IRCA promedio ({promedio_irca}) indica **{categoria_irca}** en la calidad del agua.")
+        elif categoria_irca in ["Riesgo medio", "Riesgo bajo"]:
+            st.info(f"El IRCA promedio ({promedio_irca}) indica **{categoria_irca}** en la calidad del agua.")
+        else:
+            st.success(f"El IRCA promedio ({promedio_irca}) indica **{categoria_irca}** en la calidad del agua.")
 
     st.markdown("---")
 
@@ -198,7 +243,31 @@ def mostrar_dashboard():
     # Insights
     # ===============================================
     st.subheader("Insights")
-    if not pd.isna(promedio_pm10) and promedio_pm10 > 50:
-        st.info("Los niveles elevados de PM10 sugieren evaluar fuentes de emisión en este departamento.")
-    if not pd.isna(promedio_irca) and promedio_irca > 40:
-        st.info("El IRCA elevado puede reflejar falta de tratamiento o contaminación en fuentes de agua local.")
+    
+    if not pd.isna(promedio_pm10):
+        categoria_pm10 = clasificar_pm10(promedio_pm10)
+        if categoria_pm10 == "Excelente":
+            st.success("Los niveles de PM10 son excelentes y se encuentran por debajo de las recomendaciones de la OMS.")
+        elif categoria_pm10 == "Bueno":
+            st.success("La calidad del aire es buena en términos de PM10, aunque se recomienda mantener las acciones de control de emisiones.")
+        elif categoria_pm10 == "Aceptable":
+            st.info("La calidad del aire es aceptable. Es importante mantener vigilancia para evitar incrementos.")
+        elif categoria_pm10 == "Regular":
+            st.warning("La calidad del aire es regular según el promedio de PM10. Se encuentra dentro del límite legal, pero excede el valor recomendado por la OMS.")
+        elif categoria_pm10 == "Malo":
+            st.error("El nivel de PM10 supera los límites nacionales, indicando mala calidad del aire y posibles impactos en la salud.")
+        elif categoria_pm10 == "Muy Malo":
+            st.error("La calidad del aire es muy mala por niveles elevados de PM10. Se recomienda implementar medidas urgentes de reducción de emisiones.")
+
+    if not pd.isna(promedio_irca):
+        categoria_irca = clasificar_irca(promedio_irca)
+        if categoria_irca == "Sin riesgo":
+            st.success("El agua en este departamento se encuentra sin riesgo según el IRCA, indicando buena calidad sanitaria.")
+        elif categoria_irca == "Riesgo bajo":
+            st.info("El IRCA indica un riesgo bajo, recomendable mantener monitoreo continuo para conservar la calidad.")
+        elif categoria_irca == "Riesgo medio":
+            st.warning("El IRCA indica riesgo medio. Se recomienda investigar y mejorar los procesos de tratamiento de agua.")
+        elif categoria_irca == "Riesgo alto":
+            st.error("El IRCA indica riesgo alto en la calidad del agua. Urge intervención para mejorar el tratamiento de agua y reducir riesgos sanitarios.")
+        elif categoria_irca == "Riesgo inviable sanitariamente":
+            st.error("El IRCA indica un nivel inviable sanitariamente. Se recomienda no consumir el agua hasta que se realicen acciones de remediación.")        
