@@ -1,122 +1,187 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
-
-try:
-    import streamlit as st
-except ImportError:
-    st = None
+import streamlit as st
+import pandas as pd 
 
 sns.set_theme(style="whitegrid")
 
+# Diccionario para mapear contaminantes a sus unidades, basado en la documentación.
+# Esto hace que las etiquetas de los ejes Y sean dinámicas y precisas.
+UNIDADES_CONTAMINANTES = {
+    'PM10': 'µg/m³',
+    'O3': 'µg/m³',
+    'PST': 'µg/m³',
+    'P': 'hPa o mbar', # Presión atmosférica
+    'PM2.5': 'µg/m³',
+    'TAire2': '°C', # Temperatura del aire
+    'SO2': 'µg/m³',
+    'NO2': 'µg/m³',
+    'CO': 'ppm o mg/m³',
+    'HAire2': '%', # Humedad relativa del aire
+    'DViento': 'grados', # Dirección del viento
+    'RGlobal': 'W/m²', # Radiación solar global
+    'VViento': 'm/s o km/h' # Velocidad del viento
+}
+
 def eda_aire(df_aire, streamlit_mode=False):
-    if streamlit_mode and st:
+    """
+    Realiza el Análisis Exploratorio de Datos (EDA) para la calidad del aire.
+    Genera gráficos de evolución anual, promedios por departamento y análisis anual.
+
+    Args:
+        df_aire (pd.DataFrame): DataFrame con los datos de calidad del aire.
+                                Se espera que la columna 'anio' ya sea de tipo datetime.
+        streamlit_mode (bool): Si es True, los gráficos se muestran en Streamlit.
+                               Si es False, se muestran con plt.show().
+    """
+    if streamlit_mode:
         st.subheader("Vista general de los datos de calidad del aire")
         st.write(df_aire.head())
         st.info(f"Datos: {df_aire.shape[0]} registros, {df_aire.shape[1]} columnas")
-
-    # Conversión de tipos
-    if df_aire['anio'].dtype != 'int':
-        df_aire['anio'] = df_aire['anio'].astype(int)
+        # Asegurarse de que 'anio' es datetime para operaciones de fecha
+        # Aunque loader.py debería manejarlo, esta es una verificación de respaldo.
+        if not pd.api.types.is_datetime64_any_dtype(df_aire['anio']):
+            st.warning("La columna 'anio' no es de tipo datetime. Se intentará convertir.")
+            df_aire['anio'] = pd.to_datetime(df_aire['anio'], format='%Y', errors='coerce')
+            df_aire.dropna(subset=['anio'], inplace=True) # Eliminar filas si la conversión falla
 
     contaminantes = [
         'PM10', 'O3', 'PST', 'P', 'PM2.5', 'TAire2',
         'SO2', 'NO2', 'CO', 'HAire2', 'DViento', 'RGlobal', 'VViento'
     ]
 
+    st.subheader("Evolución Anual de Contaminantes por Departamento")
     for contaminante in contaminantes:
-        if contaminante in df_aire['variable'].unique():
-            plt.figure(figsize=(10, 5))
+        # Filtrar el DataFrame para el contaminante actual
+        # Usar .copy() para evitar SettingWithCopyWarning
+        df_contaminante = df_aire[df_aire['variable'] == contaminante].copy()
+
+        if not df_contaminante.empty:
+            fig, ax = plt.subplots(figsize=(10, 5)) # Crear figura y ejes
             sns.lineplot(
-                data=df_aire[df_aire['variable'] == contaminante],
-                x='anio',
+                data=df_contaminante,
+                x=df_contaminante['anio'].dt.year, # Usar el año numérico para el eje X
                 y='promedio',
                 hue='departamento',
-                marker='o'
+                marker='o',
+                ax=ax # Pasar los ejes al plot
             )
-            plt.title(f'Evolución Anual de {contaminante}')
-            plt.xlabel('Año')
-            plt.ylabel(f'{contaminante} (µg/m³)')
-            plt.legend(title='Departamento')
-            plt.grid(True)
+            ax.set_title(f'Evolución Anual de {contaminante}')
+            ax.set_xlabel('Año')
+            
+            # Obtener la unidad correcta del diccionario
+            unidad = UNIDADES_CONTAMINANTES.get(contaminante, 'Unidad Desconocida')
+            ax.set_ylabel(f'{contaminante} Promedio ({unidad})')
+            
+            ax.legend(title='Departamento')
+            ax.grid(True)
             plt.tight_layout()
 
-            if streamlit_mode and st:
-                st.pyplot(plt.gcf())
+            if streamlit_mode:
+                st.pyplot(fig)
             else:
                 plt.show()
+            plt.close(fig) # CERRAR LA FIGURA para liberar memoria
         else:
-            if not streamlit_mode:
-                print(f"Contaminante '{contaminante}' no encontrado en el dataset.")
+            if streamlit_mode:
+                st.info(f"Contaminante '{contaminante}' no encontrado en el dataset para el análisis de evolución.")
+            # No se necesita un 'else' para print si streamlit_mode es False, ya que no se imprime nada.
 
-    # Pivot y barplot resumen
-    df_pivot = df_aire.pivot_table(
-        index=['departamento', 'anio'],
-        columns='variable',
-        values='promedio',
-        aggfunc='mean'
-    ).reset_index()
+    # ===============================================
+    # Promedio General de Contaminantes por Departamento (Barplot)
+    # ===============================================
+    st.subheader("Promedio General de Contaminantes por Departamento")
+    
+    # Calcular promedio de 'promedio' por departamento y variable
+    df_promedios_vars = df_aire.groupby(['departamento', 'variable'])['promedio'].mean().reset_index()
 
-    df_promedios = df_pivot.drop(columns='anio').groupby('departamento').mean(numeric_only=True).reset_index()
+    # Filtrar solo los contaminantes que están en la lista UNIDADES_CONTAMINANTES
+    df_promedios_vars_filtrado = df_promedios_vars[df_promedios_vars['variable'].isin(UNIDADES_CONTAMINANTES.keys())]
 
-    df_barplot = df_promedios.melt(
-        id_vars='departamento',
-        var_name='Contaminante',
-        value_name='Valor promedio'
-    )
+    if not df_promedios_vars_filtrado.empty:
+        fig, ax = plt.subplots(figsize=(12, 6))
+        sns.barplot(
+            data=df_promedios_vars_filtrado,
+            x='variable',
+            y='promedio',
+            hue='departamento',
+            ax=ax
+        )
+        ax.set_title('Promedio General de Contaminantes por Departamento')
+        ax.set_ylabel('Valor Promedio') # Etiqueta genérica ya que las unidades varían
+        ax.set_xlabel('Contaminante')
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right') # Rotar etiquetas para mejor lectura
+        ax.legend(title='Departamento')
+        plt.tight_layout()
 
-    plt.figure(figsize=(12, 6))
-    sns.barplot(
-        data=df_barplot,
-        x='Contaminante',
-        y='Valor promedio',
-        hue='departamento'
-    )
-    plt.title('Promedio Anual de Contaminantes por Departamento')
-    plt.ylabel('µg/m³')
-    plt.xlabel('Contaminante')
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-
-    if streamlit_mode and st:
-        st.pyplot(plt.gcf())
+        if streamlit_mode:
+            st.pyplot(fig)
+        else:
+            plt.show()
+        plt.close(fig) # CERRAR LA FIGURA
     else:
-        plt.show()
+        if streamlit_mode:
+            st.info("No hay datos de promedios de contaminantes para mostrar el gráfico general.")
 
-    # Análisis anual con catplot
-    df_anual = (
-        df_aire.groupby(['anio', 'variable', 'departamento'])['promedio']
+    # ===============================================
+    # Análisis anual con catplot (promedio por año y contaminante)
+    # ===============================================
+    st.subheader("Promedio Anual de Contaminantes por Año y Departamento")
+
+    # Agrupar por año, variable y departamento para obtener el promedio
+    df_anual_grouped = (
+        df_aire.groupby([df_aire['anio'].dt.year, 'variable', 'departamento'])['promedio']
         .mean()
         .reset_index()
-        .rename(columns={'variable': 'Contaminante', 'promedio': 'Valor promedio'})
+        .rename(columns={'anio': 'Año', 'variable': 'Contaminante', 'promedio': 'Valor promedio'})
     )
 
-    g = sns.catplot(
-        data=df_anual,
-        kind="bar",
-        x="Contaminante",
-        y="Valor promedio",
-        hue="departamento",
-        col="anio",
-        col_wrap=2,
-        height=5,
-        aspect=1.5,
-        palette="tab10"
-    )
-    g.set_titles("Año {col_name}")
-    g.set_axis_labels("Contaminante", "Promedio (µg/m³)")
-    g.set_xticklabels(rotation=45)
-    plt.tight_layout()
+    # Filtrar solo los contaminantes que están en la lista UNIDADES_CONTAMINANTES
+    df_anual_grouped_filtrado = df_anual_grouped[df_anual_grouped['Contaminante'].isin(UNIDADES_CONTAMINANTES.keys())]
 
-    if streamlit_mode and st:
-        st.pyplot(g.fig)
+    if not df_anual_grouped_filtrado.empty:
+        # Crear el catplot
+        g = sns.catplot(
+            data=df_anual_grouped_filtrado,
+            kind="bar",
+            x="Contaminante",
+            y="Valor promedio",
+            hue="departamento",
+            col="Año", # Ahora usa la columna 'Año' que es numérica
+            col_wrap=2,
+            height=5,
+            aspect=1.5,
+            palette="tab10",
+            sharey=False # Importante si las unidades varían mucho entre contaminantes
+        )
+        g.set_titles("Año {col_name}")
+        
+        # Iterar sobre los ejes para establecer etiquetas de Y dinámicas si es posible,
+        # o mantener una etiqueta genérica si hay muchas unidades diferentes en el mismo panel.
+        # Por simplicidad, mantendremos una etiqueta genérica para el eje Y,
+        # y el título del gráfico ya indica el contexto.
+        g.set_axis_labels("Contaminante", "Valor Promedio")
+        g.set_xticklabels(rotation=45, ha='right')
+        plt.tight_layout()
+
+        if streamlit_mode:
+            st.pyplot(g.fig)
+        else:
+            plt.show()
+        plt.close(g.fig) # CERRAR LA FIGURA
     else:
-        plt.show()
+        if streamlit_mode:
+            st.info("No hay datos anuales de contaminantes para mostrar el catplot.")
 
     if not streamlit_mode:
         print("\nEDA de calidad del aire finalizado exitosamente.\n")
 
-# Ejecución directa
+# Ejecución directa para pruebas locales (fuera de Streamlit)
 if __name__ == "__main__":
+    # Importar loader correctamente desde src
     import src.loader as loader
-    df_aire, _ = loader.cargar_datos()
-    eda_aire(df_aire)
+    df_aire_test, _ = loader.cargar_datos() # Cargar datos para la prueba
+    if df_aire_test is not None:
+        eda_aire(df_aire_test)
+    else:
+        print("No se pudieron cargar los datos para ejecutar el EDA.")

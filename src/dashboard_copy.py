@@ -3,10 +3,9 @@ import pandas as pd
 import plotly.express as px
 import datetime
 from streamlit_extras.metric_cards import style_metric_cards
-# loader no se importa aquí porque los DataFrames se pasarán como argumentos
+from . import loader_copy
 
 def clasificar_irca(valor):
-    """Clasifica el valor del IRCA en categorías de riesgo."""
     if pd.isna(valor):
         return "Sin datos"
     if 0 <= valor <= 5:
@@ -23,11 +22,9 @@ def clasificar_irca(valor):
         return "Valor fuera de rango"
 
 def clasificar_pm10(valor):
-    """Clasifica el valor de PM10 en categorías de calidad del aire."""
     if pd.isna(valor):
         return "Sin datos"
-    # Rangos basados en una interpretación general, ajustar según normativas específicas
-    if valor <= 15: # Valor de referencia OMS para promedio anual
+    if valor <= 15:
         return "Excelente"
     elif valor <= 25:
         return "Bueno"
@@ -40,14 +37,7 @@ def clasificar_pm10(valor):
     else:
         return "Muy Malo"
 
-def mostrar_dashboard(df_aire, df_agua):
-    """
-    Muestra el dashboard interactivo de calidad del aire y agua.
-    
-    Args:
-        df_aire (pd.DataFrame): DataFrame con los datos de calidad del aire.
-        df_agua (pd.DataFrame): DataFrame con los datos de calidad del agua.
-    """
+def mostrar_dashboard():
     # ===============================================
     # Estilo CSS fondo negro elegante
     # ===============================================
@@ -82,11 +72,10 @@ def mostrar_dashboard(df_aire, df_agua):
     # ===============================================
     # Filtros
     # ===============================================
-    # Los DataFrames ya vienen pre-cargados y pre-procesados desde app.py
-    # Asegurarse de que 'anio' sea datetime si no se hizo en loader.py (idealmente sí)
-    # Si loader.py ya convierte 'anio' a datetime, estas líneas no serían necesarias aquí:
-    # for df in [df_aire, df_agua]:
-    #     df['anio'] = pd.to_datetime(df['anio'], format='%Y')
+    df_aire, df_agua = loader_copy.cargar_datos(streamlit_mode=True)
+
+    for df in [df_aire, df_agua]:
+        df['anio'] = pd.to_datetime(df['anio'], format='%Y')
 
     departamentos_interes = ['CÓRDOBA', 'CESAR', 'BOLÍVAR']
 
@@ -95,62 +84,69 @@ def mostrar_dashboard(df_aire, df_agua):
     with col_filtros1:
         departamento = st.selectbox("Selecciona el departamento:", departamentos_interes)
 
-    # Asegurarse de que 'anio' ya es datetime en los DataFrames
-    # Si no, esta línea podría fallar si 'anio' es int o float
-    min_anio = df_aire['anio'].dt.year.min() if not df_aire.empty else 2000 # Valor por defecto si df está vacío
-    max_anio = df_aire['anio'].dt.year.max() if not df_aire.empty else datetime.datetime.now().year # Valor por defecto
+    min_anio = df_aire['anio'].dt.year.min()
+    max_anio = df_aire['anio'].dt.year.max()
 
     with col_filtros2:
         rango_anios = st.slider(
             "Selecciona rango de años:",
-            min_value=int(min_anio), # Asegurar que sean enteros para el slider
-            max_value=int(max_anio),
-            value=(int(min_anio), int(max_anio)),
+            min_value=min_anio,
+            max_value=max_anio,
+            value=(min_anio, max_anio),
             step=1
         )
 
     # ===============================================
-    # Filtrado de datos basado en las selecciones del usuario
+    # Filtrado
     # ===============================================
     df_aire_filtrado = df_aire[
         (df_aire['departamento'] == departamento) &
         (df_aire['anio'].dt.year >= rango_anios[0]) &
         (df_aire['anio'].dt.year <= rango_anios[1])
-    ].copy() # Usar .copy() para evitar SettingWithCopyWarning
+    ]
 
     df_agua_filtrado = df_agua[
         (df_agua['departamento'] == departamento) &
         (df_agua['anio'].dt.year >= rango_anios[0]) &
         (df_agua['anio'].dt.year <= rango_anios[1])
-    ].copy() # Usar .copy() para evitar SettingWithCopyWarning
+    ]
 
     # ===============================================
-    # KPIs (Indicadores Clave de Desempeño)
+    # KPIs
     # ===============================================
     st.subheader("Indicadores Clave de Desempeño (KPIs)")
 
     col1, col2, col3 = st.columns(3)
 
     # PM10
-    promedio_pm10 = df_aire_filtrado[df_aire_filtrado['variable'].str.upper() == 'PM10']['promedio'].mean()
+    promedio_pm10 = round(
+        df_aire_filtrado[df_aire_filtrado['variable'].str.upper() == 'PM10']['promedio'].mean(),
+        2
+    )
     if pd.isna(promedio_pm10):
         promedio_pm10_texto = "Sin datos"
     else:
-        promedio_pm10_texto = f"{promedio_pm10:.2f} µg/m³" # Formato a 2 decimales
+        promedio_pm10_texto = f"{promedio_pm10} µg/m³"
 
     # PM2.5
-    promedio_pm25 = df_aire_filtrado[df_aire_filtrado['variable'].str.upper() == 'PM2.5']['promedio'].mean()
+    promedio_pm25 = round(
+        df_aire_filtrado[df_aire_filtrado['variable'].str.upper() == 'PM2.5']['promedio'].mean(),
+        2
+    )
     if pd.isna(promedio_pm25):
         promedio_pm25_texto = "Sin datos"
     else:
-        promedio_pm25_texto = f"{promedio_pm25:.2f} µg/m³" # Formato a 2 decimales
+        promedio_pm25_texto = f"{promedio_pm25} µg/m³"
 
     # IRCA
-    promedio_irca = df_agua_filtrado['irca'].mean()
+    promedio_irca = round(
+        df_agua_filtrado['irca'].mean(),
+        2
+    )
     if pd.isna(promedio_irca):
         promedio_irca_texto = "Sin datos"
     else:
-        promedio_irca_texto = f"{promedio_irca:.2f}" # Formato a 2 decimales
+        promedio_irca_texto = f"{promedio_irca}"
 
     with col1:
         st.metric("PM10 Promedio", promedio_pm10_texto)
@@ -171,7 +167,6 @@ def mostrar_dashboard(df_aire, df_agua):
     df_pm10 = df_aire_filtrado[df_aire_filtrado['variable'].str.upper() == 'PM10']
     if not df_pm10.empty:
         st.markdown("**Tendencia de PM10 (µg/m³) por Año**")
-        # Asegurarse de agrupar por el año numérico para el eje X de Plotly si es necesario
         df_pm10_grouped = df_pm10.groupby(df_pm10['anio'].dt.year)['promedio'].mean().reset_index()
         fig_pm10 = px.line(
             df_pm10_grouped,
@@ -190,11 +185,10 @@ def mostrar_dashboard(df_aire, df_agua):
     # Boxplot IRCA
     if not df_agua_filtrado.empty:
         st.markdown("**Distribución de IRCA por Año**")
-        # Crear una columna de año numérico para el eje X si 'anio' es datetime
-        df_agua_filtrado['anio_num'] = df_agua_filtrado['anio'].dt.year 
+        df_agua_filtrado['anio_num'] = df_agua_filtrado['anio'].dt.year
         fig_irca = px.box(
             df_agua_filtrado,
-            x='anio_num', # Usar la columna numérica para el boxplot
+            x='anio_num',
             y='irca',
             labels={'anio_num': 'Año', 'irca': 'IRCA'},
             template='plotly_dark',
@@ -228,20 +222,20 @@ def mostrar_dashboard(df_aire, df_agua):
     if not pd.isna(promedio_pm10):
         categoria_pm10 = clasificar_pm10(promedio_pm10)
         if categoria_pm10 in ["Malo", "Muy Malo"]:
-            st.error(f"El PM10 promedio ({promedio_pm10:.2f} µg/m³) indica **{categoria_pm10}** calidad del aire. Supera los límites recomendados y puede afectar la salud.")
+            st.error(f"El PM10 promedio ({promedio_pm10} µg/m³) indica **{categoria_pm10}** calidad del aire. Supera los límites recomendados y puede afectar la salud.")
         elif categoria_pm10 in ["Regular", "Aceptable"]:
-            st.warning(f"El PM10 promedio ({promedio_pm10:.2f} µg/m³) indica **{categoria_pm10}** calidad del aire. Se recomienda monitoreo y control de emisiones.")
+            st.warning(f"El PM10 promedio ({promedio_pm10} µg/m³) indica **{categoria_pm10}** calidad del aire. Se recomienda monitoreo y control de emisiones.")
         else:
-            st.success(f"El PM10 promedio ({promedio_pm10:.2f} µg/m³) indica **{categoria_pm10}** calidad del aire.")        
+            st.success(f"El PM10 promedio ({promedio_pm10} µg/m³) indica **{categoria_pm10}** calidad del aire.")        
 
     if not pd.isna(promedio_irca):
         categoria_irca = clasificar_irca(promedio_irca)
         if categoria_irca in ["Riesgo alto", "Riesgo inviable sanitariamente"]:
-            st.warning(f"El IRCA promedio ({promedio_irca:.2f}) indica **{categoria_irca}** en la calidad del agua.")
+            st.warning(f"El IRCA promedio ({promedio_irca}) indica **{categoria_irca}** en la calidad del agua.")
         elif categoria_irca in ["Riesgo medio", "Riesgo bajo"]:
-            st.info(f"El IRCA promedio ({promedio_irca:.2f}) indica **{categoria_irca}** en la calidad del agua.")
+            st.info(f"El IRCA promedio ({promedio_irca}) indica **{categoria_irca}** en la calidad del agua.")
         else:
-            st.success(f"El IRCA promedio ({promedio_irca:.2f}) indica **{categoria_irca}** en la calidad del agua.")
+            st.success(f"El IRCA promedio ({promedio_irca}) indica **{categoria_irca}** en la calidad del agua.")
 
     st.markdown("---")
 
@@ -276,4 +270,4 @@ def mostrar_dashboard(df_aire, df_agua):
         elif categoria_irca == "Riesgo alto":
             st.error("El IRCA indica riesgo alto en la calidad del agua. Urge intervención para mejorar el tratamiento de agua y reducir riesgos sanitarios.")
         elif categoria_irca == "Riesgo inviable sanitariamente":
-            st.error("El IRCA indica un nivel inviable sanitariamente. Se recomienda no consumir el agua hasta que se realicen acciones de remediación.")
+            st.error("El IRCA indica un nivel inviable sanitariamente. Se recomienda no consumir el agua hasta que se realicen acciones de remediación.")        

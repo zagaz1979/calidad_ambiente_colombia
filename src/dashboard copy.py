@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import datetime
 from streamlit_extras.metric_cards import style_metric_cards
-from src import loader
+from . import loader_copy
 
 def mostrar_dashboard():
     # ===============================================
@@ -41,7 +41,7 @@ def mostrar_dashboard():
     # ===============================================
     # Filtros en dos columnas
     # ===============================================
-    df_aire, df_agua = loader.cargar_datos(streamlit_mode=True)
+    df_aire, df_agua = loader_copy.cargar_datos(streamlit_mode=True)
 
     for df in [df_aire, df_agua]:
         df['anio'] = pd.to_datetime(df['anio'], format='%Y')

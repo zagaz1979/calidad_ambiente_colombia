@@ -1,0 +1,105 @@
+# app.py
+# ===============================================
+# Streamlit App - Análisis de Calidad del Aire y Agua en Colombia
+# Departamentos: [CÓRDOBA, CESAR, BOLÍVAR]
+# ===============================================
+
+import streamlit as st
+#import pandas as pd
+from . import eda_agua_copy, eda_aire_copy, loader_copy
+from . import modelado_copy
+
+st.set_page_config(page_title="Calidad del Aire y Agua en Colombia", layout="wide")
+
+st.title("Análisis de Calidad del Aire y Agua en Colombia")
+st.write("""
+Esta aplicación permite explorar interactivamente la calidad del aire y del agua en los departamentos de **Córdoba, Cesar y Bolívar** de Colombia, utilizando herramientas de análisis de datos en Python.
+""")
+
+# -------------------------------
+# Sidebar - Menú de Navegación
+# -------------------------------
+menu = st.sidebar.selectbox(
+    "Selecciona una sección",
+    (
+        "Dashboard",
+        "EDA - Calidad del Aire", 
+        "EDA - Calidad del Agua", 
+        "Modelado Predictivo", 
+        "Análisis de Outliers PM10",
+        "Análisis de Correlación PM10",
+        "Modelado Avanzado",
+        "Modelado Avanzado Completo",
+        "Modelado mas Variables",
+        "Modelado Avanzado Features"
+    )
+)
+
+# -------------------------------
+# Sección: Dashboard
+# -------------------------------
+if menu == "Dashboard":
+    from . import dashboard_copy
+    dashboard_copy.mostrar_dashboard()
+
+
+# -------------------------------
+# Sección: EDA - Calidad del Aire
+# -------------------------------
+elif menu == "EDA - Calidad del Aire":
+    st.header("Análisis Exploratorio de Datos - Calidad del Aire")
+    df_aire, _ = loader_copy.cargar_datos()
+    eda_aire_copy.eda_aire(df_aire, streamlit_mode=True)
+    
+# -------------------------------
+# Sección: EDA - Calidad del Agua
+# -------------------------------
+elif menu == "EDA - Calidad del Agua":
+    st.header("Análisis Exploratorio de Datos - Calidad del Agua")    
+    _, df_agua = loader_copy.cargar_datos()
+    eda_agua_copy.eda_agua(df_agua, streamlit_mode=True)
+    
+# -------------------------------
+# Sección: Modelado Predictivo
+# -------------------------------
+elif menu == "Modelado Predictivo":
+    st.header("Modelado Predictivo")
+
+    st.write("""
+    En esta sección se puede ejecutar un modelo de predicción de la calidad del aire
+    utilizando regresión para proyectar valores de contaminantes a futuro.
+    """)
+    modelado_copy.modelar_calidad_aire(streamlit_mode=True)
+    modelado_copy.modelar_calidad_agua(streamlit_mode=True)
+
+elif menu == "Análisis de Outliers PM10":
+    from src import analisis_outliers_pm10
+    analisis_outliers_pm10.analisis_outliers_pm10()
+
+elif menu == "Análisis de Correlación PM10":
+    from src import correlacion_pm10
+    correlacion_pm10.correlacion_pm10()
+
+elif menu == "Modelado Avanzado":
+    from src import modelado_avanzado
+    modelado_avanzado.modelar_avanzado()
+
+elif menu == "Modelado Avanzado Completo":
+    from . import modelado_avanzado_completo_copy
+    modelado_avanzado_completo_copy.modelar_avanzado_completo()
+
+elif menu == "Modelado mas Variables":
+    from src import modelado_mas_variables
+    modelado_mas_variables.ejecutar_modelado_avanzado_features()
+
+elif menu == "Modelado Avanzado Features":
+    from . import modelado_avanzado_features_streamlit_func_copy
+    modelado_avanzado_features_streamlit_func_copy.modelado_avanzado_features_streamlit()
+
+
+# -------------------------------
+# Footer
+# -------------------------------
+st.markdown("---")
+st.markdown("Aplicación desarrollada por [César García, Luis Rodriguez y Rosalinda Parra] | Versión: 1.0.0")
+
