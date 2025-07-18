@@ -1,254 +1,383 @@
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import streamlit as st
+import pandas as pd
+import plotly.express as px
+import datetime
+from streamlit_extras.metric_cards import style_metric_cards
+# loader no se importa aquí porque los DataFrames se pasarán como argumentos
 
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import PolynomialFeatures
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.model_selection import train_test_split
-
-sns.set_theme(style="whitegrid")
-
-# Diccionario para mapear contaminantes a sus unidades, para etiquetas de gráficos.
+# Diccionario para mapear contaminantes a sus unidades, basado en la documentación.
 UNIDADES_CONTAMINANTES = {
-    'PM10': 'µg/m³',
-    'O3': 'µg/m³',
-    'PST': 'µg/m³',
-    'P': 'hPa o mbar',
-    'PM2.5': 'µg/m³',
-    'TAire2': '°C',
-    'SO2': 'µg/m³',
-    'NO2': 'µg/m³',
-    'CO': 'ppm o mg/m³',
-    'HAire2': '%',
-    'DViento': 'grados',
-    'RGlobal': 'W/m²',
-    'VViento': 'm/s o km/h'
+    'PM10': 'µg/m³',    # Partículas con diámetro aerodinámico de 10 micrómetros o menos.
+    'O3': 'µg/m³',      # Ozono troposférico.
+    'PST': 'µg/m³',     # Partículas Suspendidas Totales.
+    'P': 'hPa o mbar',  # Presión atmosférica.
+    'PM2.5': 'µg/m³',   # Partículas con diámetro aerodinámico de 2.5 micrómetros o menos.
+    'TAire2': '°C',     # Temperatura del aire.
+    'SO2': 'µg/m³',     # Dióxido de azufre.
+    'NO2': 'µg/m³',     # Dióxido de nitrógeno.
+    'CO': 'ppm o mg/m³',# Monóxido de carbono.
+    'HAire2': '%',      # Humedad relativa del aire.
+    'DViento': 'grados',# Dirección del viento.
+    'RGlobal': 'W/m²',  # Radiación solar global.
+    'VViento': 'm/s o km/h', # Velocidad del viento.
+    'PLiquida': 'mm'    # Precipitación líquida (lluvia, llovizna, etc.).
 }
 
-def modelar_avanzado_completo(df_aire):
+def clasificar_irca(valor):
     """
-    Realiza un modelado predictivo avanzado de la calidad del aire (PM10)
-    comparando Regresión Lineal, Regresión Polinómica y Random Forest.
-    Permite la selección interactiva de departamento y contaminante.
+    Clasifica el valor del IRCA en categorías de riesgo según la proporción de puntaje:
+    0 a 5 %: Sin riesgo
+    5,1 a 14 %: Riesgo bajo
+    14,1 a 35 %: Riesgo medio
+    35,1 a 80 %: Riesgo alto
+    80,1 a 100 %: Inviable sanitariamente
+    """
+    if pd.isna(valor):
+        return "Sin datos"
+    if 0 <= valor <= 5:
+        return "Sin riesgo"
+    elif 5 < valor <= 14: # Cubre 5.1 a 14
+        return "Riesgo bajo"
+    elif 14 < valor <= 35: # Cubre 14.1 a 35
+        return "Riesgo medio"
+    elif 35 < valor <= 80: # Cubre 35.1 a 80
+        return "Riesgo alto"
+    elif 80 < valor <= 100: # Cubre 80.1 a 100
+        return "Riesgo inviable sanitariamente"
+    else:
+        return "Valor fuera de rango"
 
+def clasificar_pm10(valor):
+    """Clasifica el valor de PM10 (promedio 24 horas) según la Resolución 2254 de 2017."""
+    if pd.isna(valor):
+        return "Sin datos"
+    
+    if 0 <= valor <= 50:
+        return "Buena" # La contaminación atmosférica supone un riesgo bajo o nulo para la salud.
+    elif 50 < valor <= 100:
+        return "Aceptable" # Algunas personas sensibles pueden experimentar efectos adversos leves.
+    elif 100 < valor <= 150:
+        return "Dañina a la salud de grupos sensibles" # Niños, ancianos y aquellos con enfermedades respiratorias pueden verse afectados.
+    elif 150 < valor <= 200:
+        return "Dañina a la salud" # Toda la población puede comenzar a experimentar efectos adversos para la salud.
+    elif 200 < valor <= 300:
+        return "Muy dañina a la salud" # Riesgo significativo de efectos adversos para la salud en toda la población.
+    elif valor > 300: # La resolución menciona hasta 500 para Peligrosa, pero el rango ICA es 301-500.
+        return "Peligrosa" # Riesgo grave de efectos adversos para la salud en toda la población.
+    else:
+        return "Valor fuera de rango"
+
+def clasificar_pm25(valor):
+    """Clasifica el valor de PM2.5 (promedio 24 horas) según la Resolución 2254 de 2017."""
+    if pd.isna(valor):
+        return "Sin datos"
+    
+    if 0 <= valor <= 12:
+        return "Buena" # La contaminación atmosférica supone un riesgo bajo o nulo para la salud.
+    elif 12 < valor <= 37:
+        return "Aceptable" # Algunas personas sensibles pueden experimentar efectos adversos leves.
+    elif 37 < valor <= 55:
+        return "Dañina a la salud de grupos sensibles" # Niños, ancianos y aquellos con enfermedades respiratorias pueden verse afectados.
+    elif 55 < valor <= 150: # La resolución tiene 56-150 para dañina a la salud.
+        return "Dañina a la salud" # Toda la población puede comenzar a experimentar efectos adversos para la salud.
+    elif 150 < valor <= 250:
+        return "Muy dañina a la salud" # Riesgo significativo de efectos adversos para la salud en toda la población.
+    elif valor > 250: # La resolución menciona hasta 500 para Peligrosa, pero el rango ICA es 251-500.
+        return "Peligrosa" # Riesgo grave de efectos adversos para la salud en toda la población.
+    else:
+        return "Valor fuera de rango"
+
+def mostrar_dashboard(df_aire, df_agua):
+    """
+    Muestra el dashboard interactivo de calidad del aire y agua.
+    
     Args:
         df_aire (pd.DataFrame): DataFrame con los datos de calidad del aire.
-                                Se espera que la columna 'anio' sea de tipo datetime.
+        df_agua (pd.DataFrame): DataFrame con los datos de calidad del agua.
     """
-    st.title("Modelado Avanzado de Calidad del Aire")
-    st.write("Compara el rendimiento de Regresión Lineal, Regresión Polinómica y Random Forest para la predicción de contaminantes.")
+    # ===============================================
+    # Estilo CSS fondo negro elegante
+    # ===============================================
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background-color: #000;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .stMetricValue {
+            font-size: 24px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    # Obtener lista de departamentos y contaminantes únicos del DataFrame
-    departamentos_disponibles = df_aire['departamento'].unique().tolist()
-    contaminantes_disponibles = df_aire['variable'].unique().tolist()
-
-    # Usar st.columns para colocar los selectbox uno al lado del otro
-    col1, col2 = st.columns(2)
-
+    # ===============================================
+    # Encabezado
+    # ===============================================
+    col1, col2 = st.columns([7, 3])
     with col1:
-        departamento_objetivo = st.selectbox(
-            "Selecciona el departamento:",
-            departamentos_disponibles,
-            index=departamentos_disponibles.index('CÓRDOBA') if 'CÓRDOBA' in departamentos_disponibles else 0,
-            key='adv_air_dept_select'
-        )
+        st.title("Dashboard de Calidad del Aire y Agua en Colombia")
+        st.caption("Departamentos: Córdoba, Cesar y Bolívar")
     with col2:
-        contaminante_objetivo = st.selectbox(
-            "Selecciona el contaminante a modelar:",
-            contaminantes_disponibles,
-            index=contaminantes_disponibles.index('PM10') if 'PM10' in contaminantes_disponibles else 0,
-            key='adv_air_cont_select'
+        fecha_actual = datetime.datetime.now().strftime('%d %b %Y, %H:%M')
+        st.caption("")
+        st.success(f"Última actualización: {fecha_actual}")
+
+    st.markdown("---")
+
+    # ===============================================
+    # Filtros
+    # ===============================================
+    departamentos_interes = ['CÓRDOBA', 'CESAR', 'BOLÍVAR']
+
+    col_filtros1, col_filtros2 = st.columns(2)
+
+    with col_filtros1:
+        departamento = st.selectbox("Selecciona el departamento:", departamentos_interes)
+
+    min_anio = df_aire['anio'].dt.year.min() if not df_aire.empty else 2000
+    max_anio = df_aire['anio'].dt.year.max() if not df_aire.empty else datetime.datetime.now().year
+
+    with col_filtros2:
+        rango_anios = st.slider(
+            "Selecciona rango de años:",
+            min_value=int(min_anio),
+            max_value=int(max_anio),
+            value=(int(min_anio), int(max_anio)),
+            step=1
         )
-    
-    # Filtrar datos según las selecciones del usuario
-    df_filtrado = df_aire[
-        (df_aire['departamento'] == departamento_objetivo) &
-        (df_aire['variable'] == contaminante_objetivo)
-    ].copy() # Usar .copy() para evitar SettingWithCopyWarning
 
-    if df_filtrado.empty:
-        st.warning(f"No hay datos de {contaminante_objetivo} en {departamento_objetivo} para modelar.")
-        return
+    # ===============================================
+    # Filtrado de datos basado en las selecciones del usuario
+    # ===============================================
+    df_aire_filtrado = df_aire[
+        (df_aire['departamento'] == departamento) &
+        (df_aire['anio'].dt.year >= rango_anios[0]) &
+        (df_aire['anio'].dt.year <= rango_anios[1])
+    ].copy()
 
-    # Asegurarse de que 'promedio' y 'anio' no contengan NaNs para el modelado
-    df_filtrado.dropna(subset=['anio', 'promedio'], inplace=True)
-    if df_filtrado.empty:
-        st.warning(f"No hay suficientes datos limpios de {contaminante_objetivo} en {departamento_objetivo} para modelar después de eliminar NaNs.")
-        return
+    df_agua_filtrado = df_agua[
+        (df_agua['departamento'] == departamento) &
+        (df_agua['anio'].dt.year >= rango_anios[0]) &
+        (df_agua['anio'].dt.year <= rango_anios[1])
+    ].copy()
 
-    # Usar el año numérico como característica (X)
-    X = df_filtrado[['anio']].apply(lambda x: x.dt.year).values # Convertir datetime a año numérico
-    y = df_filtrado['promedio'].values
+    # ===============================================
+    # KPIs (Indicadores Clave de Desempeño)
+    # ===============================================
+    st.subheader("Indicadores Clave de Desempeño (KPIs)")
 
-    # ======================================================================
-    # NUEVAS VERIFICACIONES PARA train_test_split y cálculo de métricas
-    # (replicadas de modelado_avanzado_features_streamlit_func.py)
-    # ======================================================================
-    
-    # 1. Verificar si hay suficientes puntos de datos para el split
-    if len(X) < 2: # Necesitas al menos 2 puntos para cualquier split
-        st.warning(f"No hay suficientes puntos de datos ({len(X)}) para realizar el modelado y la evaluación. Se necesitan al menos 2 puntos de datos limpios.")
-        # Mostrar métricas como NaN/0.0000 y salir
-        st.subheader("Resultados de los Modelos (en datos de prueba)")
-        col1_res, col2_res, col3_res = st.columns(3)
-        col1_res.metric("Lineal R²", "nan")
-        col1_res.metric("Lineal RMSE", "0.0000")
-        col2_res.metric("Polinómica R²", "nan")
-        col2_res.metric("Polinómica RMSE", "0.0000")
-        col3_res.metric("Random Forest R²", "nan")
-        col3_res.metric("Random Forest RMSE", "0.0000")
-        return
+    col1_kpi, col2_kpi, col3_kpi = st.columns(3)
 
-    # Determinar test_size dinámicamente para asegurar al menos 1 muestra de prueba
-    if len(X) < 5: # Si el total de puntos de datos es pequeño
-        test_size_val = 1 / len(X) if len(X) > 1 else 0 # Asegura al menos 1 en test si >1 total
-        st.info(f"Advertencia: Pocos datos ({len(X)}). El conjunto de prueba será muy pequeño. Las métricas pueden no ser representativas.")
+    # PM10
+    promedio_pm10 = df_aire_filtrado[df_aire_filtrado['variable'].str.upper() == 'PM10']['promedio'].mean()
+    if pd.isna(promedio_pm10):
+        promedio_pm10_texto = "Sin datos"
     else:
-        test_size_val = 0.2
+        promedio_pm10_texto = f"{promedio_pm10:.2f} µg/m³"
 
-    # Realizar el split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size_val, random_state=42)
+    # PM2.5
+    promedio_pm25 = df_aire_filtrado[df_aire_filtrado['variable'].str.upper() == 'PM2.5']['promedio'].mean()
+    if pd.isna(promedio_pm25):
+        promedio_pm25_texto = "Sin datos"
+    else:
+        promedio_pm25_texto = f"{promedio_pm25:.2f} µg/m³"
 
-    # 2. Verificar el conjunto de prueba (y_test) para el cálculo de métricas
-    if len(y_test) < 2 or y_test.var() == 0:
-        st.warning(f"No hay suficientes datos en el conjunto de prueba ({len(y_test)} puntos) o la varianza de los valores reales es cero. Las métricas de R² serán 'nan' y RMSE podría ser '0.0000' (no representativo).")
+    # IRCA
+    promedio_irca = df_agua_filtrado['irca'].mean()
+    if pd.isna(promedio_irca):
+        promedio_irca_texto = "Sin datos"
+    else:
+        promedio_irca_texto = f"{promedio_irca:.2f}"
+
+    with col1_kpi:
+        st.metric("PM10 Promedio", promedio_pm10_texto)
+    with col2_kpi:
+        st.metric("PM2.5 Promedio", promedio_pm25_texto)
+    with col3_kpi:
+        st.metric("IRCA Promedio", promedio_irca_texto)
+
+    style_metric_cards(background_color="#000", border_left_color="#009999", border_color="#DDDDDD")
+    st.markdown("---")
+
+    # ===============================================
+    # Visualizaciones con Plotly
+    # ===============================================
+    st.subheader("Visualizaciones de Datos")
+
+    # --- CAMBIO CLAVE AQUÍ: Obtener variables dinámicamente ---
+    # Obtener todas las variables únicas con datos no nulos para el departamento y rango de años seleccionados
+    df_aire_multi_var_for_plot = df_aire_filtrado.dropna(subset=['promedio']).copy()
+
+    if not df_aire_multi_var_for_plot.empty:
+        st.markdown(f"**Tendencia de Contaminantes y Parámetros Atmosféricos en {departamento}**")
         
-        # Mostrar métricas como NaN/0.0000 y salir
-        st.subheader("Resultados de los Modelos (en datos de prueba)")
-        col1_res, col2_res, col3_res = st.columns(3)
-        col1_res.metric("Lineal R²", "nan")
-        col1_res.metric("Lineal RMSE", "0.0000")
-        col2_res.metric("Polinómica R²", "nan")
-        col2_res.metric("Polinómica RMSE", "0.0000")
-        col3_res.metric("Random Forest R²", "nan")
-        col3_res.metric("Random Forest RMSE", "0.0000")
-        return # Salir de la función aquí si las métricas no son significativas
+        df_aire_multi_var_grouped = df_aire_multi_var_for_plot.groupby([df_aire_multi_var_for_plot['anio'].dt.year, 'variable'])['promedio'].mean().reset_index()
+        df_aire_multi_var_grouped.rename(columns={'anio': 'Año', 'promedio': 'Valor Promedio'}, inplace=True)
 
+        fig_multi_aire = px.line(
+            df_aire_multi_var_grouped,
+            x='Año',
+            y='Valor Promedio',
+            color='variable',
+            markers=True,
+            labels={'Año': 'Año', 'Valor Promedio': 'Valor Promedio'},
+            template='plotly_dark',
+            title=f"Tendencia de Contaminantes y Parámetros en {departamento} ({rango_anios[0]}-{rango_anios[1]})"
+        )
+        
+        # Mapear unidades para el hovertemplate. Se usa .fillna('Unidad Desconocida') por si alguna variable no está en el diccionario.
+        fig_multi_aire.update_traces(
+            hovertemplate="<b>%{data.name}</b><br>Año: %{x}<br>Valor: %{y:.2f} %{customdata[0]}",
+            customdata=df_aire_multi_var_grouped['variable'].map(UNIDADES_CONTAMINANTES).fillna('Unidad Desconocida').values.reshape(-1, 1)
+        )
 
-    # =========================
-    # Regresión Lineal
-    # =========================
-    modelo_lineal = LinearRegression()
-    modelo_lineal.fit(X_train, y_train)
-    y_pred_lineal_test = modelo_lineal.predict(X_test) # Predicción en test set
-
-    # =========================
-    # Regresión Polinómica (grado 2)
-    # =========================
-    poly = PolynomialFeatures(degree=2)
-    X_poly_train = poly.fit_transform(X_train)
-    X_poly_test = poly.transform(X_test) # Transformar el test set
-    
-    modelo_poly = LinearRegression()
-    modelo_poly.fit(X_poly_train, y_train)
-    y_pred_poly_test = modelo_poly.predict(X_poly_test) # Predicción en test set
-
-    # =========================
-    # Random Forest
-    # =========================
-    modelo_rf = RandomForestRegressor(n_estimators=100, random_state=42)
-    modelo_rf.fit(X_train, y_train)
-    y_pred_rf_test = modelo_rf.predict(X_test) # Predicción en test set
-
-    # =========================
-    # Métricas (evaluadas en el conjunto de prueba)
-    # =========================
-    r2_lineal = r2_score(y_test, y_pred_lineal_test)
-    rmse_lineal = np.sqrt(mean_squared_error(y_test, y_pred_lineal_test))
-
-    r2_poly = r2_score(y_test, y_pred_poly_test)
-    rmse_poly = np.sqrt(mean_squared_error(y_test, y_pred_poly_test))
-
-    r2_rf = r2_score(y_test, y_pred_rf_test)
-    rmse_rf = np.sqrt(mean_squared_error(y_test, y_pred_rf_test))
-
-    # =========================
-    # Predicciones para visualización (sobre todos los datos históricos)
-    # =========================
-    y_pred_lineal_full = modelo_lineal.predict(X)
-    y_pred_poly_full = modelo_poly.predict(poly.transform(X))
-    y_pred_rf_full = modelo_rf.predict(X)
-
-    # =========================
-    # Predicciones 2024-2025
-    # =========================
-    st.subheader("Predicciones para 2024 y 2025")
-    # Generar años futuros
-    # CORRECCIÓN: Usar 'max_anio_historico' directamente sin [0]
-    max_anio_historico = X.max() 
-    X_futuro_years = np.array([[year] for year in range(max_anio_historico + 1, max_anio_historico + 3)])
-    
-    # Transformar para modelo polinómico
-    X_futuro_poly = poly.transform(X_futuro_years)
-    
-    # Realizar predicciones futuras
-    pred_lineal_futuro = modelo_lineal.predict(X_futuro_years)
-    pred_poly_futuro = modelo_poly.predict(X_futuro_poly)
-    pred_rf_futuro = modelo_rf.predict(X_futuro_years)
-
-    # Crear DataFrame de predicciones futuras
-    pred_df = pd.DataFrame({
-        "Año": [year[0] for year in X_futuro_years],
-        "Lineal": pred_lineal_futuro,
-        "Polinómica": pred_poly_futuro,
-        "Random Forest": pred_rf_futuro
-    })
-    st.table(pred_df)
-
-    # =========================
-    # Visualización Comparativa
-    # =========================
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.scatter(X, y, color='blue', label='Datos reales')
-    ax.plot(X, y_pred_lineal_full, color='red', linestyle='--', label='Lineal')
-    ax.plot(X, y_pred_poly_full, color='green', linestyle='-.', label='Polinómica (grado 2)')
-    ax.plot(X, y_pred_rf_full, color='purple', linestyle='-', label='Random Forest')
-    ax.set_title(f"Comparación de Modelos de Predicción de {contaminante_objetivo} en {departamento_objetivo}")
-    ax.set_xlabel("Año")
-    
-    # Obtener la unidad correcta del diccionario
-    unidad = UNIDADES_CONTAMINANTES.get(contaminante_objetivo, 'Unidad Desconocida')
-    ax.set_ylabel(f"{contaminante_objetivo} Promedio ({unidad})")
-    
-    ax.legend()
-    st.pyplot(fig)
-    # Guardar la figura antes de cerrarla
-    try:
-        output_dir = "./outputs"
-        import os
-        os.makedirs(output_dir, exist_ok=True)
-        fig.savefig(os.path.join(output_dir, f"comparacion_modelos_{contaminante_objetivo.lower()}_{departamento_objetivo.lower()}.png"))
-        st.info(f"Gráfico guardado en: {output_dir}/comparacion_modelos_{contaminante_objetivo.lower()}_{departamento_objetivo.lower()}.png")
-    except Exception as e:
-        st.warning(f"No se pudo guardar el gráfico: {e}")
-    plt.close(fig) # CERRAR LA FIGURA
-
-    # =========================
-    # Resultados en Streamlit
-    # =========================
-    st.subheader("Métricas de Evaluación (en datos de prueba)")
-
-    col1_res, col2_res, col3_res = st.columns(3)
-    with col1_res:
-        st.metric("Lineal R²", f"{r2_lineal:.4f}" if not np.isnan(r2_lineal) else "nan")
-        st.metric("Lineal RMSE", f"{rmse_lineal:.4f}")
-    with col2_res:
-        st.metric("Polinómica R²", f"{r2_poly:.4f}" if not np.isnan(r2_poly) else "nan")
-        st.metric("Polinómica RMSE", f"{rmse_poly:.4f}")
-    with col3_res:
-        st.metric("Random Forest R²", f"{r2_rf:.4f}" if not np.isnan(r2_rf) else "nan")
-        st.metric("Random Forest RMSE", f"{rmse_rf:.4f}")
-
-# Ejecución directa opcional para pruebas locales (fuera de Streamlit)
-if __name__ == "__main__":
-    import src.loader as loader # Importar loader correctamente desde src
-    df_aire_test, _ = loader.cargar_datos() # Cargar datos para la prueba
-    if df_aire_test is not None:
-        modelar_avanzado_completo(df_aire_test)
+        st.plotly_chart(fig_multi_aire, use_container_width=True)
     else:
-        print("No se pudieron cargar los datos para ejecutar el modelado avanzado completo.")
+        st.info("No hay datos de contaminantes de aire para este departamento en el rango seleccionado.")
 
+    # Boxplot IRCA
+    if not df_agua_filtrado.empty:
+        st.markdown("**Distribución de IRCA por Año**")
+        df_agua_filtrado['anio_num'] = df_agua_filtrado['anio'].dt.year 
+        fig_irca = px.box(
+            df_agua_filtrado,
+            x='anio_num',
+            y='irca',
+            labels={'anio_num': 'Año', 'irca': 'IRCA'},
+            template='plotly_dark',
+            color_discrete_sequence=['#66b2b2'],
+            title=f"Distribución de IRCA en {departamento}"
+        )
+        st.plotly_chart(fig_irca, use_container_width=True)
+    else:
+        st.info("No hay datos de IRCA para este departamento en el rango seleccionado.")
+
+    st.markdown("---")
+
+    # ===============================================
+    # Tablas de datos
+    # ===============================================
+    st.subheader("Datos Filtrados")
+
+    tab1, tab2 = st.tabs(["Calidad del Aire", "Calidad del Agua"])
+    with tab1:
+        st.dataframe(df_aire_filtrado, use_container_width=True)
+    with tab2:
+        st.dataframe(df_agua_filtrado, use_container_width=True)
+
+    st.markdown("---")
+
+    # ===============================================
+    # Alertas
+    # ===============================================
+    st.subheader("Alertas")
+
+    # Alerta PM10
+    if not pd.isna(promedio_pm10):
+        categoria_pm10 = clasificar_pm10(promedio_pm10)
+        if categoria_pm10 == "Peligrosa":
+            st.error(f"El PM10 promedio ({promedio_pm10:.2f} µg/m³) indica **{categoria_pm10}** calidad del aire. Riesgo grave de efectos adversos para la salud en toda la población.")
+        elif categoria_pm10 == "Muy dañina a la salud":
+            st.error(f"El PM10 promedio ({promedio_pm10:.2f} µg/m³) indica **{categoria_pm10}** calidad del aire. Riesgo significativo de efectos adversos para la salud en toda la población.")
+        elif categoria_pm10 == "Dañina a la salud":
+            st.error(f"El PM10 promedio ({promedio_pm10:.2f} µg/m³) indica **{categoria_pm10}** calidad del aire. Toda la población puede comenzar a experimentar efectos adversos para la salud.")
+        elif categoria_pm10 == "Dañina a la salud de grupos sensibles":
+            st.warning(f"El PM10 promedio ({promedio_pm10:.2f} µg/m³) indica **{categoria_pm10}** calidad del aire. Niños, ancianos y aquellos con enfermedades respiratorias pueden verse afectados.")
+        elif categoria_pm10 == "Aceptable":
+            st.info(f"El PM10 promedio ({promedio_pm10:.2f} µg/m³) indica **{categoria_pm10}** calidad del aire. Algunas personas sensibles pueden experimentar efectos adversos leves.")
+        elif categoria_pm10 == "Buena":
+            st.success(f"El PM10 promedio ({promedio_pm10:.2f} µg/m³) indica **{categoria_pm10}** calidad del aire. La contaminación atmosférica supone un riesgo bajo o nulo para la salud.")
+        else:
+            st.info(f"El PM10 promedio ({promedio_pm10:.2f} µg/m³) indica **{categoria_pm10}** calidad del aire.")
+
+    # Alerta PM2.5
+    if not pd.isna(promedio_pm25):
+        categoria_pm25 = clasificar_pm25(promedio_pm25)
+        if categoria_pm25 == "Peligrosa":
+            st.error(f"El PM2.5 promedio ({promedio_pm25:.2f} µg/m³) indica **{categoria_pm25}** calidad del aire. Riesgo grave de efectos adversos para la salud en toda la población.")
+        elif categoria_pm25 == "Muy dañina a la salud":
+            st.error(f"El PM2.5 promedio ({promedio_pm25:.2f} µg/m³) indica **{categoria_pm25}** calidad del aire. Riesgo significativo de efectos adversos para la salud en toda la población.")
+        elif categoria_pm25 == "Dañina a la salud":
+            st.error(f"El PM2.5 promedio ({promedio_pm25:.2f} µg/m³) indica **{categoria_pm25}** calidad del aire. Toda la población puede comenzar a experimentar efectos adversos para la salud.")
+        elif categoria_pm25 == "Dañina a la salud de grupos sensibles":
+            st.warning(f"El PM2.5 promedio ({promedio_pm25:.2f} µg/m³) indica **{categoria_pm25}** calidad del aire. Niños, ancianos y aquellos con enfermedades respiratorias pueden verse afectados.")
+        elif categoria_pm25 == "Aceptable":
+            st.info(f"El PM2.5 promedio ({promedio_pm25:.2f} µg/m³) indica **{categoria_pm25}** calidad del aire. Algunas personas sensibles pueden experimentar efectos adversos leves.")
+        elif categoria_pm25 == "Buena":
+            st.success(f"El PM2.5 promedio ({promedio_pm25:.2f} µg/m³) indica **{categoria_pm25}** calidad del aire. La contaminación atmosférica supone un riesgo bajo o nulo para la salud.")
+        else:
+            st.info(f"El PM2.5 promedio ({promedio_pm25:.2f} µg/m³) indica **{categoria_pm25}** calidad del aire.")
+
+    # Alerta IRCA
+    if not pd.isna(promedio_irca):
+        categoria_irca = clasificar_irca(promedio_irca)
+        if categoria_irca == "Sin riesgo":
+            st.success("El agua en este departamento se encuentra sin riesgo según el IRCA, indicando buena calidad sanitaria.")
+        elif categoria_irca == "Riesgo bajo":
+            st.info("El IRCA indica un riesgo bajo, recomendable mantener monitoreo continuo para conservar la calidad.")
+        elif categoria_irca == "Riesgo medio":
+            st.warning("El IRCA indica riesgo medio. Se recomienda investigar y mejorar los procesos de tratamiento de agua.")
+        elif categoria_irca == "Riesgo alto":
+            st.error("El IRCA indica riesgo alto en la calidad del agua. Urge intervención para mejorar el tratamiento de agua y reducir riesgos sanitarios.")
+        elif categoria_irca == "Riesgo inviable sanitariamente":
+            st.error("El IRCA indica un nivel inviable sanitariamente. Se recomienda no consumir el agua hasta que se realicen acciones de remediación.")
+
+    st.markdown("---")
+
+    # ===============================================
+    # Insights
+    # ===============================================
+    st.subheader("Insights")
+    
+    # Insight PM10
+    if not pd.isna(promedio_pm10):
+        categoria_pm10 = clasificar_pm10(promedio_pm10)
+        if categoria_pm10 == "Peligrosa":
+            st.error("El nivel de PM10 es **Peligroso**. Se requiere acción inmediata para proteger la salud pública debido al riesgo grave de efectos adversos en toda la población.")
+        elif categoria_pm10 == "Muy dañina a la salud":
+            st.error("La calidad del aire es **Muy dañina a la salud** por niveles elevados de PM10. Se recomienda implementar medidas urgentes de reducción de emisiones y evitar la exposición al aire libre.")
+        elif categoria_pm10 == "Dañina a la salud":
+            st.error("La calidad del aire es **Dañina a la salud** por niveles de PM10. Toda la población puede experimentar efectos adversos. Se aconseja reducir la exposición.")
+        elif categoria_pm10 == "Dañina a la salud de grupos sensibles":
+            st.warning("La calidad del aire es **Dañina a la salud de grupos sensibles** por PM10. Niños, ancianos y personas con enfermedades respiratorias deben limitar la exposición al aire libre.")
+        elif categoria_pm10 == "Aceptable":
+            st.info("La calidad del aire es **Aceptable** en términos de PM10. Algunas personas sensibles pueden experimentar efectos leves. Se recomienda vigilancia.")
+        elif categoria_pm10 == "Buena":
+            st.success("La calidad del aire es **Buena** en términos de PM10. La contaminación atmosférica supone un riesgo bajo o nulo para la salud.")
+        else:
+            st.info(f"El PM10 promedio ({promedio_pm10:.2f} µg/m³) indica **{categoria_pm10}** calidad del aire.")
+
+    # Insight PM2.5
+    if not pd.isna(promedio_pm25):
+        categoria_pm25 = clasificar_pm25(promedio_pm25)
+        if categoria_pm25 == "Peligrosa":
+            st.error("El nivel de PM2.5 es **Peligroso**. Riesgo grave de efectos adversos para la salud en toda la población. Se requiere acción inmediata.")
+        elif categoria_pm25 == "Muy dañina a la salud":
+            st.error("La calidad del aire es **Muy dañina a la salud** por niveles elevados de PM2.5. Riesgo significativo de efectos adversos para la salud en toda la población. Evitar la exposición al aire libre.")
+        elif categoria_pm25 == "Dañina a la salud":
+            st.error("La calidad del aire es **Dañina a la salud** por niveles de PM2.5. Toda la población puede experimentar efectos adversos. Se aconseja reducir la exposición.")
+        elif categoria_pm25 == "Dañina a la salud de grupos sensibles":
+            st.warning("La calidad del aire es **Dañina a la salud de grupos sensibles** por PM2.5. Personas sensibles deben limitar la exposición al aire libre. Puede causar irritación respiratoria.")
+        elif categoria_pm25 == "Aceptable":
+            st.info("La calidad del aire es **Aceptable** en términos de PM2.5. Algunas personas sensibles pueden experimentar efectos leves. Se recomienda vigilancia.")
+        elif categoria_pm25 == "Buena":
+            st.success("La calidad del aire es **Buena** en términos de PM2.5. La contaminación atmosférica supone un riesgo bajo o nulo para la salud.")
+        else:
+            st.info(f"El PM2.5 promedio ({promedio_pm25:.2f} µg/m³) indica **{categoria_pm25}** calidad del aire.")
+
+    # Insight IRCA
+    if not pd.isna(promedio_irca):
+        categoria_irca = clasificar_irca(promedio_irca)
+        if categoria_irca == "Sin riesgo":
+            st.success("El agua en este departamento se encuentra sin riesgo según el IRCA, indicando buena calidad sanitaria.")
+        elif categoria_irca == "Riesgo bajo":
+            st.info("El IRCA indica un riesgo bajo, recomendable mantener monitoreo continuo para conservar la calidad.")
+        elif categoria_irca == "Riesgo medio":
+            st.warning("El IRCA indica riesgo medio. Se recomienda investigar y mejorar los procesos de tratamiento de agua.")
+        elif categoria_irca == "Riesgo alto":
+            st.error("El IRCA indica riesgo alto en la calidad del agua. Urge intervención para mejorar el tratamiento de agua y reducir riesgos sanitarios.")
+        elif categoria_irca == "Riesgo inviable sanitariamente":
+            st.error("El IRCA indica un nivel inviable sanitariamente. Se recomienda no consumir el agua hasta que se realicen acciones de remediación.")

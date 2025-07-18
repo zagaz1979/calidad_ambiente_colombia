@@ -13,22 +13,24 @@ import os
 
 sns.set_theme(style="whitegrid")
 
-# Diccionario para mapear contaminantes a sus unidades, para etiquetas de gráficos.
+# Diccionario para mapear contaminantes a sus unidades, basado en la documentación.
 UNIDADES_CONTAMINANTES = {
-    'PM10': 'µg/m³',
-    'O3': 'µg/m³',
-    'PST': 'µg/m³',
-    'P': 'hPa o mbar',
-    'PM2.5': 'µg/m³',
-    'TAire2': '°C',
-    'SO2': 'µg/m³',
-    'NO2': 'µg/m³',
-    'CO': 'ppm o mg/m³',
-    'HAire2': '%',
-    'DViento': 'grados',
-    'RGlobal': 'W/m²',
-    'VViento': 'm/s o km/h'
+    'PM10': 'µg/m³',    # Partículas con diámetro aerodinámico de 10 micrómetros o menos.
+    'O3': 'µg/m³',      # Ozono troposférico.
+    'PST': 'µg/m³',     # Partículas Suspendidas Totales.
+    'P': 'hPa o mbar',  # Presión atmosférica.
+    'PM2.5': 'µg/m³',   # Partículas con diámetro aerodinámico de 2.5 micrómetros o menos.
+    'TAire2': '°C',     # Temperatura del aire.
+    'SO2': 'µg/m³',     # Dióxido de azufre.
+    'NO2': 'µg/m³',     # Dióxido de nitrógeno.
+    'CO': 'ppm o mg/m³',# Monóxido de carbono.
+    'HAire2': '%',      # Humedad relativa del aire.
+    'DViento': 'grados',# Dirección del viento.
+    'RGlobal': 'W/m²',  # Radiación solar global.
+    'VViento': 'm/s o km/h', # Velocidad del viento.
+    'PLiquida': 'mm'    # Precipitación líquida (lluvia, llovizna, etc.).
 }
+
 
 def modelado_avanzado_features_streamlit(df_aire):
     """
@@ -42,10 +44,9 @@ def modelado_avanzado_features_streamlit(df_aire):
     st.title("Modelado Predictivo Avanzado con Selección de Features")
     st.write("Selecciona las variables predictoras y compara el rendimiento de diferentes modelos.")
 
-    # Obtener lista de departamentos y contaminantes únicos del DataFrame
+    # Obtener lista de departamentos únicos del DataFrame
     departamentos_disponibles = df_aire['departamento'].unique().tolist()
-    contaminantes_disponibles = df_aire['variable'].unique().tolist()
-
+    
     # Usar st.columns para colocar los selectbox uno al lado del otro
     col1, col2 = st.columns(2)
 
@@ -54,24 +55,47 @@ def modelado_avanzado_features_streamlit(df_aire):
             "Selecciona el departamento:",
             departamentos_disponibles,
             index=departamentos_disponibles.index('CÓRDOBA') if 'CÓRDOBA' in departamentos_disponibles else 0,
-            key='feat_air_dept_select'
+            key='feat_air_dept_select_func' # Clave única para este selectbox
         )
+    
+    # --- FILTRADO DINÁMICO DE CONTAMINANTES DISPONIBLES POR DEPARTAMENTO ---
+    # Filtrar el DataFrame por el departamento seleccionado para obtener sus contaminantes
+    df_aire_por_departamento = df_aire[df_aire['departamento'] == departamento_objetivo].copy()
+    
+    # Obtener solo las variables que tienen datos no nulos en 'promedio' para el departamento seleccionado
+    # Esto asegura que solo se muestren contaminantes con datos válidos para modelar
+    contaminantes_disponibles_por_dep = df_aire_por_departamento.dropna(subset=['promedio'])['variable'].unique().tolist()
+    
+    # Si no hay contaminantes disponibles para el departamento seleccionado, mostrar advertencia y salir
+    if not contaminantes_disponibles_por_dep:
+        st.warning(f"No hay contaminantes con datos disponibles para '{departamento_objetivo}'. Por favor, selecciona otro departamento.")
+        return # Salir de la función si no hay datos de contaminantes
+
+    # Asegurarse de que 'PM10' sea la opción predeterminada si está disponible, de lo contrario, la primera disponible
+    default_contaminante_index = 0
+    if 'PM10' in contaminantes_disponibles_por_dep:
+        default_contaminante_index = contaminantes_disponibles_por_dep.index('PM10')
+    elif contaminantes_disponibles_por_dep: # Si hay otros contaminantes, selecciona el primero
+        default_contaminante_index = 0
+    else: # Si la lista está vacía, esto ya se manejó arriba. Como fallback, poner -1 para que no seleccione nada si la lista es vacía.
+        default_contaminante_index = -1 # No debería llegar aquí si la verificación de 'if not contaminantes_disponibles_por_dep' funciona.
+
     with col2:
         contaminante_objetivo = st.selectbox(
             "Selecciona el contaminante a modelar (variable objetivo 'promedio'):",
-            contaminantes_disponibles,
-            index=contaminantes_disponibles.index('PM10') if 'PM10' in contaminantes_disponibles else 0,
-            key='feat_air_cont_select'
+            contaminantes_disponibles_por_dep, # Usar la lista filtrada dinámicamente
+            index=default_contaminante_index,
+            key='feat_air_cont_select_func' # Clave única para este selectbox
         )
+    # --- FIN FILTRADO DINÁMICO ---
 
-    # Filtrar el DataFrame por departamento y contaminante objetivo
-    df_filtrado_por_seleccion = df_aire[
-        (df_aire['departamento'] == departamento_objetivo) &
-        (df_aire['variable'] == contaminante_objetivo)
+    # Filtrar el DataFrame por departamento y contaminante objetivo (ahora contaminante_objetivo ya es válido para el departamento)
+    df_filtrado_por_seleccion = df_aire_por_departamento[
+        (df_aire_por_departamento['variable'] == contaminante_objetivo)
     ].copy()
 
     if df_filtrado_por_seleccion.empty:
-        st.warning(f"No hay datos disponibles para el contaminante '{contaminante_objetivo}' en el departamento de '{departamento_objetivo}' en el dataset actual. Por favor, selecciona otra combinación.")
+        st.warning(f"No hay datos disponibles para el contaminante '{contaminante_objetivo}' en el departamento de '{departamento_objetivo}' en el dataset actual. Esto no debería ocurrir si la lista de selección se filtró correctamente.")
         return
 
     # Opciones de variables numéricas para la selección de features
@@ -117,23 +141,15 @@ def modelado_avanzado_features_streamlit(df_aire):
     # 1. Verificar si hay suficientes puntos de datos para el split
     if len(X_full) < 2: # Necesitas al menos 2 puntos para cualquier split
         st.warning(f"No hay suficientes puntos de datos ({len(X_full)}) para realizar el modelado y la evaluación. Se necesitan al menos 2 puntos de datos limpios.")
-        # Mostrar métricas como NaN/0.0000 y salir
-        st.subheader("Resultados de los Modelos (en datos de prueba)")
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Lineal R²", "nan")
-        col1.metric("Lineal RMSE", "0.0000")
-        col2.metric("Polinómica R²", "nan")
-        col2.metric("Polinómica RMSE", "0.0000")
-        col3.metric("Random Forest R²", "nan")
-        col3.metric("Random Forest RMSE", "0.0000")
+        # No mostrar resultados ni predicciones, solo el mensaje
         return
 
     # Determinar test_size dinámicamente para asegurar al menos 1 muestra de prueba
     # y evitar que el test set tenga varianza cero si es posible.
     # Si tenemos muy pocos datos, es mejor no hacer un split tradicional para R2.
     if len(X_full) < 5: # Si el total de puntos de datos es pequeño
-        test_size_val = 1 / len(X_full) if len(X_full) > 1 else 0 # Asegura al menos 1 en test si >1 total
         st.info(f"Advertencia: Pocos datos ({len(X_full)}). El conjunto de prueba será muy pequeño. Las métricas pueden no ser representativas.")
+        test_size_val = 1 / len(X_full) if len(X_full) > 1 else 0 # Asegura al menos 1 en test si >1 total
     else:
         test_size_val = 0.2
 
@@ -145,16 +161,7 @@ def modelado_avanzado_features_streamlit(df_aire):
     # RMSE puede ser 0 si el modelo predice perfectamente un valor constante.
     if len(y_test) < 2 or y_test.var() == 0:
         st.warning(f"No hay suficientes datos en el conjunto de prueba ({len(y_test)} puntos) o la varianza de los valores reales es cero. Las métricas de R² serán 'nan' y RMSE podría ser '0.0000' (no representativo).")
-        
-        # Mostrar métricas como NaN/0.0000 y salir
-        st.subheader("Resultados de los Modelos (en datos de prueba)")
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Lineal R²", "nan")
-        col1.metric("Lineal RMSE", "0.0000")
-        col2.metric("Polinómica R²", "nan")
-        col2.metric("Polinómica RMSE", "0.0000")
-        col3.metric("Random Forest R²", "nan")
-        col3.metric("Random Forest RMSE", "0.0000")
+        # No mostrar resultados ni predicciones, solo el mensaje
         return # Salir de la función aquí si las métricas no son significativas
 
     # =========================
@@ -209,6 +216,7 @@ def modelado_avanzado_features_streamlit(df_aire):
     if 'anio_num' in X_full.columns:
         max_anio_historico = X_full['anio_num'].max()
     else:
+        # Fallback si 'anio_num' no está en X_full (aunque debería estar si se seleccionó)
         max_anio_historico = df_filtrado_por_seleccion['anio'].dt.year.max()
 
     futuro_anios = pd.DataFrame({'anio_num': [max_anio_historico + 1, max_anio_historico + 2]})
@@ -288,4 +296,3 @@ if __name__ == "__main__":
         modelado_avanzado_features_streamlit(df_aire_test)
     else:
         print("No se pudieron cargar los datos para ejecutar el modelado avanzado con features.")
-    

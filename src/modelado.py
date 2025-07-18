@@ -32,15 +32,16 @@ UNIDADES_CONTAMINANTES = {
     'DViento': 'grados',# Dirección del viento. Dirección desde la que sopla el viento.
     'RGlobal': 'W/m²',  # Radiación solar global. Cantidad total de energía solar recibida
                         # sobre una superficie horizontal.
-    'VViento': 'm/s o km/h' # Velocidad del viento. Velocidad con la que se mueve el aire.
+    'VViento': 'm/s o km/h', # Velocidad del viento. Velocidad con la que se mueve el aire.
                             # Puede influir en la dispersión de contaminantes.
+    'PLiquida': 'mm'    # Precipitación líquida (lluvia, llovizna, etc.).
 }
 
 
 def modelar_calidad_aire(df_aire, streamlit_mode=False):
     """
     Realiza un modelado de regresión lineal simple para la calidad del aire
-    (PM10) en un departamento seleccionado.
+    en un departamento y contaminante seleccionados.
 
     Args:
         df_aire (pd.DataFrame): DataFrame con los datos de calidad del aire.
@@ -50,26 +51,9 @@ def modelar_calidad_aire(df_aire, streamlit_mode=False):
     """
     st.subheader("Modelado de Calidad del Aire (Regresión Lineal)")
 
-    # Obtener lista de departamentos y contaminantes únicos del DataFrame
+    # Obtener lista de departamentos únicos del DataFrame
     departamentos_disponibles = df_aire['departamento'].unique().tolist()
-    contaminantes_disponibles = df_aire['variable'].unique().tolist()
-
-    '''
-    # Filtros interactivos para el usuario
-    departamento_objetivo = st.selectbox(
-        "Selecciona el departamento para el aire:",
-        departamentos_disponibles,
-        index=departamentos_disponibles.index('CÓRDOBA') if 'CÓRDOBA' in departamentos_disponibles else 0,
-        key='air_dept_select'
-    )
-    contaminante_objetivo = st.selectbox(
-        "Selecciona el contaminante a modelar:",
-        contaminantes_disponibles,
-        index=contaminantes_disponibles.index('PM10') if 'PM10' in contaminantes_disponibles else 0,
-        key='air_cont_select'
-    )
-    '''
-
+    
     # Usar st.columns para colocar los selectbox uno al lado del otro
     col1, col2 = st.columns(2)
 
@@ -78,35 +62,52 @@ def modelar_calidad_aire(df_aire, streamlit_mode=False):
             "Selecciona el departamento:",
             departamentos_disponibles,
             index=departamentos_disponibles.index('CÓRDOBA') if 'CÓRDOBA' in departamentos_disponibles else 0,
-            key='adv_air_dept_select'
+            key='adv_air_dept_select_model'
         )
-    with col2:
-        contaminante_objetivo = st.selectbox(
-            "Selecciona el contaminante a modelar:",
-            contaminantes_disponibles,
-            index=contaminantes_disponibles.index('PM10') if 'PM10' in contaminantes_disponibles else 0,
-            key='adv_air_cont_select'
-        )
-
-
-    # Filtrar datos según las selecciones del usuario
-    df_filtrado = df_aire[
-        (df_aire['departamento'] == departamento_objetivo) &
-        (df_aire['variable'] == contaminante_objetivo)
-    ].copy() # Usar .copy() para evitar SettingWithCopyWarning
-
-    if df_filtrado.empty:
-        mensaje = f"No hay datos de {contaminante_objetivo} en {departamento_objetivo} para modelar."
+    
+    # --- FILTRADO DINÁMICO DE CONTAMINANTES DISPONIBLES POR DEPARTAMENTO ---
+    # Filtrar el DataFrame por el departamento seleccionado para obtener sus contaminantes
+    df_aire_por_departamento = df_aire[df_aire['departamento'] == departamento_objetivo].copy()
+    
+    # Obtener solo las variables que tienen datos no nulos en 'promedio' para el departamento seleccionado
+    # Esto asegura que solo se muestren contaminantes con datos válidos para modelar
+    contaminantes_disponibles_por_dep = df_aire_por_departamento.dropna(subset=['promedio'])['variable'].unique().tolist()
+    
+    # Si no hay contaminantes disponibles para el departamento seleccionado, mostrar advertencia y salir
+    if not contaminantes_disponibles_por_dep:
+        mensaje = f"No hay contaminantes con datos disponibles para '{departamento_objetivo}'. Por favor, selecciona otro departamento."
         if streamlit_mode:
             st.warning(mensaje)
         else:
             print(mensaje)
-        return
+        return # Salir de la función si no hay datos de contaminantes
+
+    # Asegurarse de que 'PM10' sea la opción predeterminada si está disponible, de lo contrario, la primera disponible
+    default_contaminante_index = 0
+    if 'PM10' in contaminantes_disponibles_por_dep:
+        default_contaminante_index = contaminantes_disponibles_por_dep.index('PM10')
+    elif contaminantes_disponibles_por_dep: # Si hay otros contaminantes, selecciona el primero
+        default_contaminante_index = 0
+    else: # Si la lista está vacía, esto ya se manejó arriba. Como fallback, poner -1 para que no seleccione nada si la lista es vacía.
+        default_contaminante_index = -1 # No debería llegar aquí si la verificación de 'if not contaminantes_disponibles_por_dep' funciona.
+
+    with col2:
+        contaminante_objetivo = st.selectbox(
+            "Selecciona el contaminante a modelar:",
+            contaminantes_disponibles_por_dep, # Usar la lista filtrada dinámicamente
+            index=default_contaminante_index,
+            key='adv_air_cont_select_model'
+        )
+
+    # Filtrar datos según las selecciones del usuario (ahora contaminante_objetivo ya es válido para el departamento)
+    df_filtrado = df_aire_por_departamento[
+        (df_aire_por_departamento['variable'] == contaminante_objetivo)
+    ].copy()
 
     # Asegurarse de que 'promedio' no contenga NaNs para el modelado
     df_filtrado.dropna(subset=['promedio'], inplace=True)
     if df_filtrado.empty:
-        mensaje = f"No hay suficientes datos limpios de {contaminante_objetivo} en {departamento_objetivo} para modelar después de eliminar NaNs."
+        mensaje = f"No hay suficientes datos limpios de {contaminante_objetivo} en {departamento_objetivo} para modelar después de eliminar NaNs. Esto no debería ocurrir si la lista de selección se filtró correctamente."
         if streamlit_mode:
             st.warning(mensaje)
         else:
@@ -117,8 +118,40 @@ def modelar_calidad_aire(df_aire, streamlit_mode=False):
     X = df_filtrado[['anio']].apply(lambda x: x.dt.year).values # Convertir datetime a año numérico
     y = df_filtrado['promedio'].values
 
-    # Dividir los datos en conjuntos de entrenamiento y prueba
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # ======================================================================
+    # Verificaciones para train_test_split y cálculo de métricas
+    # ======================================================================
+    
+    # 1. Verificar si hay suficientes puntos de datos para el split
+    if len(X) < 2: # Necesitas al menos 2 puntos para cualquier split (train y test)
+        mensaje = f"No hay suficientes puntos de datos ({len(X)}) para realizar el modelado y la evaluación de {contaminante_objetivo} en {departamento_objetivo}. Se necesitan al menos 2 puntos de datos limpios."
+        if streamlit_mode:
+            st.warning(mensaje)
+            # No mostrar resultados ni predicciones, solo el mensaje
+        else:
+            print(mensaje)
+        return
+
+    # Determinar test_size dinámicamente para asegurar al menos 1 muestra de prueba
+    if len(X) < 5: # Si el total de puntos de datos es pequeño
+        test_size_val = 1 / len(X) if len(X) > 1 else 0 # Asegura al menos 1 en test si >1 total
+        if streamlit_mode:
+            st.info(f"Advertencia: Pocos datos ({len(X)}). El conjunto de prueba será muy pequeño. Las métricas pueden no ser representativas.")
+    else:
+        test_size_val = 0.2
+
+    # Realizar el split
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size_val, random_state=42)
+
+    # 2. Verificar el conjunto de prueba (y_test) para el cálculo de métricas
+    if len(y_test) < 2 or y_test.var() == 0:
+        mensaje = f"No hay suficientes datos en el conjunto de prueba ({len(y_test)} puntos) o la varianza de los valores reales es cero para {contaminante_objetivo} en {departamento_objetivo}. Las métricas de R² serán 'nan' y RMSE podría ser '0.0000' (no representativo)."
+        if streamlit_mode:
+            st.warning(mensaje)
+            # No mostrar resultados ni predicciones, solo el mensaje
+        else:
+            print(mensaje)
+        return # Salir de la función aquí si las métricas no son significativas
 
     # Entrenar el modelo de Regresión Lineal
     modelo = LinearRegression()
@@ -135,8 +168,13 @@ def modelar_calidad_aire(df_aire, streamlit_mode=False):
         st.markdown(f"**Resultados del Modelo (Regresión Lineal) para {contaminante_objetivo} en {departamento_objetivo}:**")
         st.write(f"**Coeficiente (cambio por año):** {modelo.coef_[0]:.4f}")
         st.write(f"**Término independiente (valor en año 0):** {modelo.intercept_:.4f}")
-        st.write(f"**RMSE (Error Cuadrático Medio):** {rmse:.4f}")
-        st.write(f"**R² (Coeficiente de Determinación):** {r2:.4f}")
+        
+        col1_res, col2_res = st.columns(2)
+        with col1_res:
+            st.metric("RMSE", f"{rmse:.4f}")
+        with col2_res:
+            st.metric("R²", f"{r2:.4f}" if not np.isnan(r2) else "nan")
+
 
         # Predicciones sobre el conjunto completo de datos para la visualización
         y_full_pred = modelo.predict(X)
@@ -195,7 +233,7 @@ def modelar_calidad_agua(df_agua, streamlit_mode=False):
         "Selecciona el departamento para el agua:",
         departamentos_disponibles,
         index=departamentos_disponibles.index('CÓRDOBA') if 'CÓRDOBA' in departamentos_disponibles else 0,
-        key='water_dept_select'
+        key='water_dept_select_model'
     )
 
     # Filtrar datos y agrupar por año para obtener el IRCA promedio
@@ -224,8 +262,40 @@ def modelar_calidad_agua(df_agua, streamlit_mode=False):
     X = df_grouped[['anio_num']].values # Usar el año numérico
     y = df_grouped['irca'].values
 
-    # Dividir los datos en conjuntos de entrenamiento y prueba
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # ======================================================================
+    # Verificaciones para train_test_split y cálculo de métricas (replicadas)
+    # ======================================================================
+    
+    # 1. Verificar si hay suficientes puntos de datos para el split
+    if len(X) < 2: # Necesitas al menos 2 puntos para cualquier split (train y test)
+        mensaje = f"No hay suficientes puntos de datos ({len(X)}) para realizar el modelado y la evaluación de IRCA en {departamento_objetivo}. Se necesitan al menos 2 puntos de datos limpios."
+        if streamlit_mode:
+            st.warning(mensaje)
+            # No mostrar resultados ni predicciones, solo el mensaje
+        else:
+            print(mensaje)
+        return
+
+    # Determinar test_size dinámicamente para asegurar al menos 1 muestra de prueba
+    if len(X) < 5: # Si el total de puntos de datos es pequeño
+        test_size_val = 1 / len(X) if len(X) > 1 else 0 # Asegura al menos 1 en test si >1 total
+        if streamlit_mode:
+            st.info(f"Advertencia: Pocos datos ({len(X)}). El conjunto de prueba será muy pequeño. Las métricas pueden no ser representativas.")
+    else:
+        test_size_val = 0.2
+
+    # Realizar el split
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size_val, random_state=42)
+
+    # 2. Verificar el conjunto de prueba (y_test) para el cálculo de métricas
+    if len(y_test) < 2 or y_test.var() == 0:
+        mensaje = f"No hay suficientes datos en el conjunto de prueba ({len(y_test)} puntos) o la varianza de los valores reales es cero para IRCA en {departamento_objetivo}. Las métricas de R² serán 'nan' y RMSE podría ser '0.0000' (no representativo)."
+        if streamlit_mode:
+            st.warning(mensaje)
+            # No mostrar resultados ni predicciones, solo el mensaje
+        else:
+            print(mensaje)
+        return # Salir de la función aquí si las métricas no son significativas
 
     # Entrenar el modelo de Regresión Lineal
     modelo = LinearRegression()
@@ -242,8 +312,12 @@ def modelar_calidad_agua(df_agua, streamlit_mode=False):
         st.markdown(f"**Resultados del Modelo (Regresión Lineal) para IRCA en {departamento_objetivo}:**")
         st.write(f"**Coeficiente (cambio por año):** {modelo.coef_[0]:.4f}")
         st.write(f"**Término independiente (valor en año 0):** {modelo.intercept_:.4f}")
-        st.write(f"**RMSE (Error Cuadrático Medio):** {rmse:.4f}")
-        st.write(f"**R² (Coeficiente de Determinación):** {r2:.4f}")
+        
+        col1_res, col2_res = st.columns(2)
+        with col1_res:
+            st.metric("RMSE", f"{rmse:.4f}")
+        with col2_res:
+            st.metric("R²", f"{r2:.4f}" if not np.isnan(r2) else "nan")
 
         # Predicciones sobre el conjunto completo de datos para la visualización
         y_full_pred = modelo.predict(X)
@@ -281,7 +355,7 @@ if __name__ == "__main__":
     import src.loader as loader # Importar loader correctamente desde src
     df_aire_test, df_agua_test = loader.cargar_datos() # Cargar datos para la prueba
     if df_aire_test is not None and df_agua_test is not None:
-        modelar_calidad_aire(df_aire_test)
-        modelar_calidad_agua(df_agua_test)
+        modelar_calidad_aire(df_aire_test, streamlit_mode=True) # Ejecutar en modo Streamlit para ver el comportamiento
+        modelar_calidad_agua(df_agua_test, streamlit_mode=True)
     else:
         print("No se pudieron cargar los datos para ejecutar el modelado.")

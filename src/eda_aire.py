@@ -6,21 +6,21 @@ import pandas as pd
 sns.set_theme(style="whitegrid")
 
 # Diccionario para mapear contaminantes a sus unidades, basado en la documentación.
-# Esto hace que las etiquetas de los ejes Y sean dinámicas y precisas.
 UNIDADES_CONTAMINANTES = {
-    'PM10': 'µg/m³',
-    'O3': 'µg/m³',
-    'PST': 'µg/m³',
-    'P': 'hPa o mbar', # Presión atmosférica
-    'PM2.5': 'µg/m³',
-    'TAire2': '°C', # Temperatura del aire
-    'SO2': 'µg/m³',
-    'NO2': 'µg/m³',
-    'CO': 'ppm o mg/m³',
-    'HAire2': '%', # Humedad relativa del aire
-    'DViento': 'grados', # Dirección del viento
-    'RGlobal': 'W/m²', # Radiación solar global
-    'VViento': 'm/s o km/h' # Velocidad del viento
+    'PM10': 'µg/m³',    # Partículas con diámetro aerodinámico de 10 micrómetros o menos.
+    'O3': 'µg/m³',      # Ozono troposférico.
+    'PST': 'µg/m³',     # Partículas Suspendidas Totales.
+    'P': 'hPa o mbar',  # Presión atmosférica.
+    'PM2.5': 'µg/m³',   # Partículas con diámetro aerodinámico de 2.5 micrómetros o menos.
+    'TAire2': '°C',     # Temperatura del aire.
+    'SO2': 'µg/m³',     # Dióxido de azufre.
+    'NO2': 'µg/m³',     # Dióxido de nitrógeno.
+    'CO': 'ppm o mg/m³',# Monóxido de carbono.
+    'HAire2': '%',      # Humedad relativa del aire.
+    'DViento': 'grados',# Dirección del viento.
+    'RGlobal': 'W/m²',  # Radiación solar global.
+    'VViento': 'm/s o km/h', # Velocidad del viento.
+    'PLiquida': 'mm'    # Precipitación líquida (lluvia, llovizna, etc.).
 }
 
 def eda_aire(df_aire, streamlit_mode=False):
@@ -45,13 +45,18 @@ def eda_aire(df_aire, streamlit_mode=False):
             df_aire['anio'] = pd.to_datetime(df_aire['anio'], format='%Y', errors='coerce')
             df_aire.dropna(subset=['anio'], inplace=True) # Eliminar filas si la conversión falla
 
-    contaminantes = [
-        'PM10', 'O3', 'PST', 'P', 'PM2.5', 'TAire2',
-        'SO2', 'NO2', 'CO', 'HAire2', 'DViento', 'RGlobal', 'VViento'
-    ]
+    # --- CAMBIO CLAVE AQUÍ: Obtener contaminantes dinámicamente ---
+    # Obtener todas las variables únicas que tienen datos no nulos en 'promedio'
+    # y que también están en nuestro diccionario de unidades.
+    # Esto asegura que solo se intenten graficar variables con datos válidos y unidades conocidas.
+    contaminantes_para_plotear = df_aire.dropna(subset=['promedio'])['variable'].unique().tolist()
+    # Filtrar para incluir solo las que tienen una unidad definida en UNIDADES_CONTAMINANTES
+    contaminantes_para_plotear = [c for c in contaminantes_para_plotear if c in UNIDADES_CONTAMINANTES]
+
 
     st.subheader("Evolución Anual de Contaminantes por Departamento")
-    for contaminante in contaminantes:
+    # Iterar sobre la lista dinámica de contaminantes
+    for contaminante in contaminantes_para_plotear:
         # Filtrar el DataFrame para el contaminante actual
         # Usar .copy() para evitar SettingWithCopyWarning
         df_contaminante = df_aire[df_aire['variable'] == contaminante].copy()
@@ -96,6 +101,7 @@ def eda_aire(df_aire, streamlit_mode=False):
     df_promedios_vars = df_aire.groupby(['departamento', 'variable'])['promedio'].mean().reset_index()
 
     # Filtrar solo los contaminantes que están en la lista UNIDADES_CONTAMINANTES
+    # Esto ya incluye PLiquida si está en el diccionario y en los datos.
     df_promedios_vars_filtrado = df_promedios_vars[df_promedios_vars['variable'].isin(UNIDADES_CONTAMINANTES.keys())]
 
     if not df_promedios_vars_filtrado.empty:
@@ -137,6 +143,7 @@ def eda_aire(df_aire, streamlit_mode=False):
     )
 
     # Filtrar solo los contaminantes que están en la lista UNIDADES_CONTAMINANTES
+    # Esto ya incluye PLiquida si está en el diccionario y en los datos.
     df_anual_grouped_filtrado = df_anual_grouped[df_anual_grouped['Contaminante'].isin(UNIDADES_CONTAMINANTES.keys())]
 
     if not df_anual_grouped_filtrado.empty:
@@ -182,6 +189,6 @@ if __name__ == "__main__":
     import src.loader as loader
     df_aire_test, _ = loader.cargar_datos() # Cargar datos para la prueba
     if df_aire_test is not None:
-        eda_aire(df_aire_test)
+        eda_aire(df_aire_test, streamlit_mode=True) # Ejecutar en modo Streamlit para ver el comportamiento
     else:
         print("No se pudieron cargar los datos para ejecutar el EDA.")
