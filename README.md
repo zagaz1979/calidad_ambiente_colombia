@@ -34,6 +34,7 @@ Evaluar y comprender la evolución temporal de la calidad del aire y del agua en
 1.  Identificar las problemáticas actuales de calidad de aire y agua en Córdoba, Cesar y Bolívar.
 2.  Desarrollar un sistema digital de integración de datos para el monitoreo continuo.
 3.  Implementar visualizaciones gráficas para facilitar el análisis y la toma de decisiones.
+4.  Aplicar modelos predictivos para anticipar futuros escenarios de calidad ambiental.
 
 ## Metodología
 
@@ -41,10 +42,10 @@ El proyecto se estructuró en fases interconectadas para garantizar un análisis
 
 1.  **Obtención y Preparación de Datos:**
     * Utilización de datasets públicos y oficiales de calidad del aire y agua de entidades como IDEAM, SIAC y Datos.gov.co.
-    **Aire**
-    * https://www.datos.gov.co/Ambiente-y-Desarrollo-Sostenible/Calidad-Del-Aire-En-Colombia-Promedio-Anual-/kekd-7v7h/about_data
-    **Agua**
-    * https://www.datos.gov.co/Salud-y-Protecci-n-Social/Calidad-del-Agua-para-Consumo-Humano-en-Colombia/nxt2-39c3/about_data
+    * **Aire**
+        * [https://www.datos.gov.co/Ambiente-y-Desarrollo-Sostenible/Calidad-Del-Aire-En-Colombia-Promedio-Anual-/kekd-7v7h/about_data](https://www.datos.gov.co/Ambiente-y-Desarrollo-Sostenible/Calidad-Del-Aire-En-Colombia-Promedio-Anual-/kekd-7v7h/about_data)
+    * **Agua**
+        * [https://www.datos.gov.co/Salud-y-Protecci-n-Social/Calidad-del-Agua-para-Consumo-Humano-en-Colombia/nxt2-39c3/about_data](https://www.datos.gov.co/Salud-y-Protecci-n-Social/Calidad-del-Agua-para-Consumo-Humano-en-Colombia/nxt2-39c3/about_data)
     * Carga, filtrado (para los departamentos de interés: Córdoba, Cesar, Bolívar) y limpieza de datos, incluyendo la estandarización de nombres, manejo de valores faltantes y tratamiento de valores atípicos (outliers).
 
 2.  **Análisis Exploratorio de Datos (EDA):**
@@ -114,21 +115,23 @@ El proyecto está organizado en la siguiente estructura de directorios y archivo
 
 ```
 .
+├── data/                     # Directorio para los datasets (no incluidos en el repo, se asume carga externa).
+├── outputs/                  # Directorio para almacenar resultados o archivos generados.
 ├── src/
-│   ├── loader.py             # Carga y preprocesamiento inicial de los datos.
 │   ├── dashboard.py          # Lógica para el dashboard principal de Streamlit.
 │   ├── eda_aire.py           # Funciones para el Análisis Exploratorio de Datos del aire.
 │   ├── eda_agua.py           # Funciones para el Análisis Exploratorio de Datos del agua.
+│   ├── loader.py             # Carga y preprocesamiento inicial de los datos.
 │   ├── modelado.py           # Funciones para el modelado de regresión lineal simple.
 │   ├── modelado_avanzado_completo.py # Funciones para modelado avanzado (Polinómica, Random Forest).
 │   └── modelado_avanzado_features_streamlit_func.py # Funciones adicionales de modelado avanzado para Streamlit.
-├── app.py                    # Archivo principal de la aplicación Streamlit.
-├── README.md                 # Este archivo.
-├── requirements.txt          # Dependencias del proyecto.
-├── Proyecto calidad aire y agua.pdf # Documento completo del proyecto.
+├── .gitignore                # Archivo para ignorar archivos y directorios en Git.
 ├── 1-Documentación columnas calidad del aire en Colombia.pdf # Documentación de columnas (aire).
 ├── 2-Documentación columnas calidad del agua.pdf # Documentación de columnas (agua).
-└── data/                     # Directorio para los datasets (no incluidos en el repo, se asume carga externa).
+├── app.py                    # Archivo principal de la aplicación Streamlit.
+├── Proyecto calidad aire y agua.pdf # Documento completo del proyecto.
+├── README.md                 # Este archivo.
+└── requirements.txt          # Dependencias del proyecto.
 ```
 
 ## Cómo Ejecutar la Aplicación Streamlit

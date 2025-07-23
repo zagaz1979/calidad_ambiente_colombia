@@ -73,7 +73,7 @@ notebooks_convertidos/
 *.spec
 
 # Otros
-*.pdf
+#*.pdf
 *.db
 
 # Cache de pytest
