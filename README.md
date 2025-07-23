@@ -112,7 +112,7 @@ Se identificaron riesgos relacionados con la calidad y disponibilidad de datos (
 
 El proyecto está organizado en la siguiente estructura de directorios y archivos principales:
 
-
+```
 .
 ├── src/
 │   ├── loader.py             # Carga y preprocesamiento inicial de los datos.
@@ -129,7 +129,7 @@ El proyecto está organizado en la siguiente estructura de directorios y archivo
 ├── 1-Documentación columnas calidad del aire en Colombia.pdf # Documentación de columnas (aire).
 ├── 2-Documentación columnas calidad del agua.pdf # Documentación de columnas (agua).
 └── data/                     # Directorio para los datasets (no incluidos en el repo, se asume carga externa).
-
+```
 
 ## Cómo Ejecutar la Aplicación Streamlit
 
