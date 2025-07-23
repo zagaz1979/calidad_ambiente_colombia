@@ -33,9 +33,9 @@ df_aire, df_agua = load_all_data()
 menu = st.sidebar.selectbox(
     "Selecciona una sección",
     (
-        "Dashboard",
         "EDA - Calidad del Aire", 
         "EDA - Calidad del Agua", 
+        "Dashboard",
         "Modelado Predictivo (Simple)", 
         "Modelado Avanzado (Comparación)",
         "Modelado con Selección de Features"
@@ -43,19 +43,9 @@ menu = st.sidebar.selectbox(
 )
 
 # -------------------------------
-# Sección: Dashboard
-# -------------------------------
-if menu == "Dashboard":
-    # Importar el módulo del dashboard solo cuando sea necesario
-    from src import dashboard 
-    st.header("Dashboard General")
-    st.write("Explora un resumen interactivo de la calidad del aire y del agua.")
-    dashboard.mostrar_dashboard(df_aire, df_agua) # Pasar los DataFrames al dashboard
-
-# -------------------------------
 # Sección: EDA - Calidad del Aire
 # -------------------------------
-elif menu == "EDA - Calidad del Aire":
+if menu == "EDA - Calidad del Aire":
     st.header("Análisis Exploratorio de Datos - Calidad del Aire")
     # eda_aire.eda_aire ahora debe aceptar df_aire como argumento
     eda_aire.eda_aire(df_aire, streamlit_mode=True)
@@ -67,7 +57,17 @@ elif menu == "EDA - Calidad del Agua":
     st.header("Análisis Exploratorio de Datos - Calidad del Agua")     
     # eda_agua.eda_agua ahora debe aceptar df_agua como argumento
     eda_agua.eda_agua(df_agua, streamlit_mode=True)
-    
+
+# -------------------------------
+# Sección: Dashboard
+# -------------------------------
+elif menu == "Dashboard":
+    # Importar el módulo del dashboard solo cuando sea necesario
+    from src import dashboard 
+    st.header("Dashboard General")
+    st.write("Explora un resumen interactivo de la calidad del aire y del agua.")
+    dashboard.mostrar_dashboard(df_aire, df_agua) # Pasar los DataFrames al dashboard
+  
 # -------------------------------
 # Sección: Modelado Predictivo (Simple)
 # -------------------------------
