@@ -52,7 +52,7 @@ ehthumbs.db
 Desktop.ini
 
 # Archivos de datos pesados
-data/*.csv
+#data/*.csv
 data/*.xlsx
 data/*.json
 
@@ -103,5 +103,5 @@ notebooks_convertidos/
 exports/
 
 # Archivos CSV filtrados (si no quieres subirlos)
-datos/aire_filtrado_caribe.csv
-datos/agua_filtrada_caribe.csv
+data/aire_filtrado_caribe.csv
+data/agua_filtrada_caribe.csv
